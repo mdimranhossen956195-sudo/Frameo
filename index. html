@@ -1,0 +1,2837 @@
+ <!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Frameo  — YouTube Size Canvas</title>
+
+<style>
+:root{
+  --radius:.75rem;
+  --background:#2c2620;
+  --foreground:#f2ede0;
+  --card:#3a3128;
+  --secondary:#453a2f;
+  --muted-foreground:#b8ab97;
+  --accent:#e6a559;
+  --accent-foreground:#2b1c0d;
+  --destructive:#d9694f;
+  --border:#55483a;
+  --shadow-panel:0 10px 30px -12px rgba(0,0,0,.7);
+  --font-display:"Arial Narrow",Arial,sans-serif;
+  --app-height:100vh;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;}
+html, body{height:100%;overflow:hidden;}
+body{margin:0;background:var(--background);color:var(--foreground);font-family:Arial,system-ui,sans-serif;overscroll-behavior:none;}
+button{font:inherit;cursor:pointer;}
+.hidden{display:none!important;}
+#app{display:flex;flex-direction:column;height:var(--app-height);overflow:hidden;}
+.font-display{font-family:var(--font-display);letter-spacing:.03em;}
+
+.topbar{display:flex;align-items:center;gap:.4rem;border-bottom:1px solid rgba(255,255,255,.08);padding:.5rem .75rem;position:relative;}
+.title-block{margin-right:auto;}
+.title-block h1{font-size:1rem;line-height:1;margin:0;}
+.title-block p{margin:.15rem 0 0;font-size:.625rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted-foreground);}
+
+main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-height:0;overflow:hidden;}
+.top-fixed{flex:0 0 auto;display:flex;flex-direction:column;gap:.5rem;}
+.scroll-area{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;gap:.5rem;}
+.panel{border-radius:var(--radius);background:var(--card);border:1px solid var(--border);padding:.75rem;box-shadow:var(--shadow-panel);}
+.label{font-size:.625rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-foreground);}
+
+.chip{display:inline-flex;align-items:center;justify-content:center;gap:.25rem;border-radius:calc(var(--radius) - 4px);border:1px solid var(--border);background:var(--secondary);color:var(--foreground);padding:.4rem .55rem;font-size:.68rem;font-weight:600;white-space: nowrap;}
+.chip:active{transform:scale(.96);}
+.chip-on,.chip-accent{background:var(--accent);color:var(--accent-foreground);border-color:var(--accent);}
+.chip-danger{color:var(--destructive);border-color:rgba(217,105,79,.45);}
+.chip.flex-1{flex:1;}
+.ml-auto{margin-left:auto;}
+.w-full{width:100%;}
+
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:2.2rem;height:2.2rem;border-radius:999px;border:1px solid var(--border);background:var(--secondary);color:var(--foreground);font-size:.8rem;}
+.icon-btn:disabled{opacity:.35;}
+.icon-btn-accent{background:var(--accent);color:var(--accent-foreground);border-color:var(--accent);}
+
+.tool-item{position:relative;display:inline-flex;align-items:center;}
+.color-picker-dropdown{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:.4rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.6rem;box-shadow:var(--shadow-panel);display:flex;flex-direction:column;gap:.5rem;z-index:100;width:180px;}
+.color-picker-dropdown.hidden{display:none;}
+
+.stage-row{display:flex;}
+.stage-wrap{position:relative;flex:1;min-width:0;width:100%;aspect-ratio:16/9;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-panel);background:var(--background);touch-action:none;display:flex;align-items:center;justify-content:center;}
+.stage{display:block;background:#ffffff;touch-action:none;-webkit-user-select:none;user-select:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);}
+
+.tool-rail{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.5rem;border-radius:var(--radius);background:var(--card);border:1px solid var(--border);padding:.5rem;box-shadow:var(--shadow-panel);}
+.tool-rail.tool-rail--shapes{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch;}
+.quick-shape-thumb{flex:0 0 auto;width:2.6rem;height:2.6rem;padding:2px;}
+.quick-shape-thumb img{width:100%;height:100%;object-fit:contain;border-radius:6px;background:rgba(255,255,255,.85);}
+
+.transport{display:flex;align-items:center;gap:.3rem;padding:.4rem .5rem;flex-wrap:nowrap;justify-content:space-between;}
+.transport-left{display:flex;align-items:center;gap:.25rem;}
+.transport-right{display:flex;align-items:center;gap:.25rem;}
+.frame-counter{font-size:.7rem;color:var(--muted-foreground);white-space:nowrap;margin:0 .2rem;}
+.frame-counter span{color:var(--foreground);}
+
+.timeline-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;gap:.2rem;padding-bottom:2px;}
+.timeline-head::-webkit-scrollbar{display:none;}
+.chip-xs{flex:1 1 0;min-width:0;padding:.32rem .1rem;font-size:.58rem;gap:.1rem;overflow:hidden;text-overflow:ellipsis;}
+
+.xsheet-wrap{overflow-x:auto;overflow-y:visible;border-radius:8px;border:1px solid var(--border);background:var(--secondary);-webkit-overflow-scrolling:touch;position:relative;}
+.xsheet-table{display:flex;flex-direction:column;min-width:max-content;}
+.xsheet-header-row,.xsheet-row{display:flex;height:34px;}
+.xsheet-header-row{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);}
+.xsheet-corner{position:sticky;left:0;z-index:20;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 4px;}
+.xsheet-colheads{display:flex;}
+.xsheet-colhead{width:36px;min-width:36px;border-right:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:.62rem;color:var(--muted-foreground);cursor:pointer;}
+.xsheet-colhead.current{color:var(--accent);font-weight:700;background:rgba(230,165,89,.1);}
+.xsheet-row{border-bottom:1px solid rgba(255,255,255,.05);}
+.xsheet-rowhead{position:sticky;left:0;z-index:5;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;gap:.2rem;padding:0 4px;}
+.xsheet-rowhead.active{background:#473a2f;}
+.xsheet-rowhead .visbtn{flex:0 0 auto;width:1.1rem;height:1.1rem;border-radius:3px;border:1px solid var(--border);background:var(--card);color:var(--foreground);font-size:.55rem;display:flex;align-items:center;justify-content:center;padding:0;}
+.xsheet-rowhead .lname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;background:none;border:none;color:inherit;font-size:.62rem;padding:.1rem;}
+.xsheet-cells{display:flex;position:relative;z-index:0;}
+.xsheet-cell{width:36px;min-width:36px;border-right:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;position:relative;background:var(--secondary);padding:0;cursor:pointer;}
+.xsheet-cell:active{background:rgba(230,165,89,.2);}
+.xsheet-cell.current-frame{background:rgba(230,165,89,.08);}
+.xsheet-cell.active-cell{outline:2px solid var(--accent);outline-offset:-2px;z-index:2;}
+.xsheet-dot{width:7px;height:7px;border-radius:999px;background:var(--accent);}
+.xsheet-kf-line{position:absolute;top:50%;height:2px;background:rgba(230,165,89,.55);transform:translateY(-50%);pointer-events:none;z-index:1;}
+.xsheet-kf-diamond{width:9px;height:9px;background:var(--accent);border:1px solid #2b1c0d;transform:rotate(45deg);position:relative;z-index:2;}
+.xsheet-kf-diamond.selected{background:#ffffff;}
+
+.audio-track-row{display:flex;min-height:40px;border-top:1px solid var(--border);background:rgba(0,0,0,.15);}
+.audio-track-rowhead{position:sticky;left:0;z-index:5;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;gap:.2rem;padding:0 4px;font-size:.62rem;}
+.audio-track-rowhead .lname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.audio-track-cells{display:flex;align-items:flex-end;}
+.audio-track-cell{width:36px;min-width:36px;height:40px;border-right:1px solid rgba(255,255,255,.05);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;cursor:pointer;}
+.audio-track-cell.current-frame{background:rgba(230,165,89,.08);}
+.audio-track-bar{width:55%;min-height:3px;border-radius:2px;background:rgba(255,140,66,.28);}
+.audio-track-bar.has-voice{background:#ff8c2b;box-shadow:0 0 6px rgba(255,140,43,.55);}
+.audio-empty-hint{display:flex;align-items:center;padding:0 .5rem;font-size:.62rem;color:var(--muted-foreground);}
+
+.layer-popup-menu{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;box-shadow:var(--shadow-panel);width:90%;max-width:300px;max-height:70vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:1000;display:flex;flex-direction:column;gap:.5rem;}
+.layer-popup-menu.hidden{display:none;}
+.layer-item-box{background:var(--secondary);border:1px solid var(--border);border-radius:6px;padding:6px;display:flex;flex-direction:column;gap:4px;}
+.layer-item-row{display:flex;align-items:center;gap:4px;}
+
+.swatch-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;}
+.swatch{width:1.7rem;height:1.7rem;border-radius:999px;border:2px solid var(--border);padding:0;}
+.swatch-on{border-color:var(--accent);transform:scale(1.12);}
+
+input[type=range]{width:100%;accent-color:var(--accent);}
+.field{margin-top:.75rem;}
+.field:first-child{margin-top:0;}
+.stepper-row{display:flex;align-items:center;gap:.35rem;margin-top:.35rem;}
+.stepper-btn{flex:0 0 auto;width:1.9rem;height:1.9rem;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;line-height:1;}
+.stepper-input{flex:1;min-width:0;text-align:center;background:var(--secondary);color:var(--foreground);border:1px solid var(--border);border-radius:6px;padding:.3rem .2rem;font-size:.7rem;font-family:inherit;-moz-appearance:textfield;}
+.stepper-input::-webkit-outer-spin-button,.stepper-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+
+.export-dropdown{position:absolute;top:100%;right:.5rem;z-index:100;width:240px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem;box-shadow:var(--shadow-panel);}
+.export-dropdown.hidden{display:none;}
+.export-overlay{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(44,38,32,.85);backdrop-filter:blur(4px);}
+.export-overlay.hidden{display:none;}
+.export-overlay .panel{text-align:center;}
+.export-hint{margin:.35rem 0 0;font-size:.72rem;color:var(--muted-foreground);}
+.compact-btn{padding:.2rem .35rem;font-size:.6rem;}
+
+@media(max-width:420px){.icon-btn{width:2rem;height:2rem;font-size:.75rem;}}
+</style>
+</head>
+
+<body>
+
+<div id="app">
+
+<header class="topbar">
+  <div class="title-block">
+    <h1 class="font-display">FRAMEO </h1>
+  </div>
+
+  <button id="btnUndo" class="icon-btn">↶</button>
+  <button id="btnRedo" class="icon-btn">↷</button>
+  <button id="btnImportAudio" class="chip compact-btn">+ Audio</button>
+  <button id="btnImportGallery" class="chip compact-btn">+Gallery</button>
+  <button id="btnExportTab" class="chip chip-accent compact-btn">Export</button>
+
+  <div id="exportDropdown" class="export-dropdown hidden">
+    <button id="b4k" class="chip w-full chip-accent" style="margin-bottom:.35rem;">Export YouTube 4K</button>
+    <button id="b1080" class="chip w-full" style="margin-bottom:.35rem;">Export YouTube 1080p</button>
+    <button id="bpng" class="chip w-full">Export PNG Frame</button>
+  </div>
+</header>
+
+<main>
+  <div class="top-fixed">
+    <div class="stage-row">
+      <div class="stage-wrap" id="stageWrap">
+        <canvas id="canvas" class="stage"></canvas>
+      </div>
+    </div>
+
+    <div class="tool-rail" id="toolRail"></div>
+
+    <div class="panel transport">
+      <div class="transport-left">
+        <button id="btnFirst" class="icon-btn">⏮</button>
+        <button id="btnPrev" class="icon-btn">◀</button>
+        <button id="btnPlay" class="icon-btn icon-btn-accent">▶</button>
+        <button id="btnNext" class="icon-btn">▶</button>
+        <div class="frame-counter">
+          <span id="frameCur">1</span>/<span id="frameTotal">1</span>
+        </div>
+      </div>
+
+      <div class="transport-right">
+        <div class="tool-item" style="display:inline-flex;">
+          <button id="btnFpsToggle" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">FPS: 12</button>
+          <div id="fpsDropdown" class="color-picker-dropdown hidden" style="width: 170px;">
+            <div class="field" style="margin:0;">
+              <div class="label" id="fpsLabel">Rate: 12 fps</div>
+              <input type="range" id="fpsRange" min="2" max="60" value="12" style="width:100%; margin-top:4px;" />
+              <div class="stepper-row" id="fpsStepperRow"></div>
+            </div>
+          </div>
+        </div>
+        <div class="tool-item" style="display:inline-flex;">
+          <button id="btnOnion" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">Onion</button>
+          <div id="onionDropdown" class="color-picker-dropdown hidden" style="width: 190px;">
+            <div class="field" style="margin:0;">
+              <button id="btnOnionToggle" class="chip w-full" style="margin-bottom:.5rem;">Onion: ON</button>
+              <div class="label">Before frames: <span id="onionBeforeLabel">1</span></div>
+              <div class="stepper-row" id="onionBeforeStepperRow"></div>
+              <div class="label" style="margin-top:.5rem;">After frames: <span id="onionAfterLabel">1</span></div>
+              <div class="stepper-row" id="onionAfterStepperRow"></div>
+            </div>
+          </div>
+        </div>
+        <button id="btnLoop" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">Loop</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll-area">
+    <div class="panel">
+      <div class="timeline-head">
+        <button id="btnAddKeyframeTop" class="chip chip-xs chip-accent hidden">+KF</button>
+        <button id="btnAddFrame" class="chip chip-xs">+Frame</button>
+        <button id="btnDupFrame" class="chip chip-xs">Dup</button>
+        <button id="btnCopy" class="chip chip-xs">Copy</button>
+        <button id="btnPaste" class="chip chip-xs">Paste</button>
+        <button id="btnClear" class="chip chip-xs">Clear</button>
+        <button id="btnDelFrame" class="chip chip-xs chip-danger">Del</button>
+      </div>
+      <div class="xsheet-wrap" id="xsheetWrap">
+        <div class="xsheet-table" id="timelineStrip"></div>
+      </div>
+    </div>
+
+    <div id="panelContent"></div>
+  </div>
+</main>
+
+<div id="exportOverlay" class="export-overlay hidden">
+  <div class="panel">
+    <div class="font-display" id="exportLabel" style="font-size:1.125rem"></div>
+    <p class="export-hint">ট্যাব খোলা রাখুন — ফাইল নিজে থেকেই ডাউনলোড হবে</p>
+  </div>
+</div>
+
+</div>
+
+<input id="photoInput" type="file" accept="image/*" class="hidden" />
+<input id="audioInput" type="file" accept="audio/*" class="hidden" />
+<input id="shapeInput" type="file" accept="image/*" class="hidden" />
+<audio id="audioEl" class="hidden" preload="auto"></audio>
+
+<script>
+(function(){
+"use strict";
+
+function setAppHeight(){
+  const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  document.documentElement.style.setProperty("--app-height", h + "px");
+}
+setAppHeight();
+window.addEventListener("resize", setAppHeight);
+window.addEventListener("orientationchange", () => setTimeout(setAppHeight, 150));
+if(window.visualViewport){ window.visualViewport.addEventListener("resize", setAppHeight); }
+
+const STAGE_W = 1280;
+const STAGE_H = 720;
+
+const PALETTE = [
+  "#111111", "#ff8a3d", "#ffd166", "#4cc9a4",
+  "#4aa8ff", "#c77dff", "#ff5d73", "#888888",
+  "#ffffff", "#00f5d4", "#7209b7", "#f72585"
+];
+
+const TOOLS = [
+  { id:"select", icon:"⛶", label:"Select / Transform" },
+  { id:"brush", icon:"🖌️", label:"Brush" },
+  { id:"settings", icon:"⚙️", label:"Tool Settings" },
+  { id:"eraser", icon:"🧽", label:"Eraser" },
+  { id:"line", icon:"／", label:"Line" },
+  { id:"rect", icon:"▭", label:"Rect" },
+  { id:"ellipse", icon:"◯", label:"Ellipse" }
+];
+
+const AUTOSAVE_KEY = "frameo-studio-yt-v6";
+
+const EASINGS = {
+  linear:    t => t,
+  easeIn:    t => t*t,
+  easeOut:   t => t*(2-t),
+  easeInOut: t => t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2,
+  bounce:    t => {
+    const n1=7.5625, d1=2.75;
+    if(t < 1/d1) return n1*t*t;
+    if(t < 2/d1){ t -= 1.5/d1; return n1*t*t + 0.75; }
+    if(t < 2.5/d1){ t -= 2.25/d1; return n1*t*t + 0.9375; }
+    t -= 2.625/d1; return n1*t*t + 0.984375;
+  }
+};
+const EASING_LABELS = {
+  linear:"Linear", easeIn:"Ease In", easeOut:"Ease Out",
+  easeInOut:"Ease In-Out", bounce:"Bounce"
+};
+
+function cloneImageObjects(objs){
+  return objs.map(o => ({
+    ...o,
+    keyframes: o.keyframes.map(k => ({ ...k })),
+    shapes: (o.shapes||[]).map(s => ({ ...s })),
+    shapeKeyframes: (o.shapeKeyframes||[]).map(k => ({ ...k }))
+  }));
+}
+
+function sortedKeyframes(obj){
+  return [...obj.keyframes].sort((a,b)=>a.frame-b.frame);
+}
+
+function dedupeIdenticalKeyframes(obj){
+  const kfs = sortedKeyframes(obj);
+  if(kfs.length<=1) return { ...obj, keyframes: kfs };
+
+  const EPS = 1e-6;
+  const same = (a,b) =>
+    Math.abs(a.x-b.x)<EPS && Math.abs(a.y-b.y)<EPS &&
+    Math.abs(a.w-b.w)<EPS && Math.abs(a.h-b.h)<EPS &&
+    Math.abs(a.rotation-b.rotation)<EPS && Math.abs(a.opacity-b.opacity)<EPS &&
+    !!a.flipX===!!b.flipX && !!a.flipY===!!b.flipY;
+
+  const kept = [kfs[0]];
+  for(let i=1; i<kfs.length; i++){
+    if(!same(kept[kept.length-1], kfs[i])) kept.push(kfs[i]);
+  }
+  return { ...obj, keyframes: kept };
+}
+
+function dedupeOverlappingImageObjects(objs){
+  const EPS = 0.02;
+  const removed = new Set();
+
+  for(let i=0; i<objs.length; i++){
+    if(removed.has(objs[i].id)) continue;
+    for(let j=i+1; j<objs.length; j++){
+      if(removed.has(objs[j].id)) continue;
+      const a = objs[i], b = objs[j];
+      if(a.src !== b.src || a.layerId !== b.layerId) continue;
+
+      const ta = a.keyframes[0], tb = b.keyframes[0];
+      if(!ta || !tb) continue;
+
+      const close =
+        Math.abs(ta.x-tb.x)<EPS && Math.abs(ta.y-tb.y)<EPS &&
+        Math.abs(ta.w-tb.w)<EPS && Math.abs(ta.h-tb.h)<EPS;
+
+      if(close){
+        const keepA = a.keyframes.length >= b.keyframes.length;
+        removed.add(keepA ? b.id : a.id);
+      }
+    }
+  }
+
+  return objs.filter(o=>!removed.has(o.id));
+}
+
+function objectTransformAt(obj, frame){
+  const kfs = sortedKeyframes(obj);
+  if(!kfs.length) return null;
+  if(frame <= kfs[0].frame) return kfs[0];
+  if(frame >= kfs[kfs.length-1].frame) return kfs[kfs.length-1];
+
+  let k1 = kfs[0], k2 = kfs[kfs.length-1];
+  for(let i=0; i<kfs.length-1; i++){
+    if(kfs[i].frame<=frame && kfs[i+1].frame>=frame){
+      k1 = kfs[i]; k2 = kfs[i+1];
+      break;
+    }
+  }
+  if(k1.frame===k2.frame) return k1;
+
+  const t0 = (frame-k1.frame)/(k2.frame-k1.frame);
+  const ease = EASINGS[k1.easing] || EASINGS.linear;
+  const t = ease(t0);
+
+  return {
+    frame,
+    x: k1.x + (k2.x-k1.x)*t,
+    y: k1.y + (k2.y-k1.y)*t,
+    w: k1.w + (k2.w-k1.w)*t,
+    h: k1.h + (k2.h-k1.h)*t,
+    rotation: k1.rotation + (k2.rotation-k1.rotation)*t,
+    opacity: k1.opacity + (k2.opacity-k1.opacity)*t,
+    flipX: !!k1.flipX,
+    flipY: !!k1.flipY
+  };
+}
+
+function sortedShapeKeyframes(obj){
+  return [...(obj.shapeKeyframes||[])].sort((a,b)=>a.frame-b.frame);
+}
+
+function getShapeById(obj, shapeId){
+  if(!shapeId || shapeId==="base") return { id:"base", src:obj.src, natW:obj.natW, natH:obj.natH };
+  const found = (obj.shapes||[]).find(s=>s.id===shapeId);
+  return found ? { id:found.id, src:found.src, natW:found.natW, natH:found.natH } : { id:"base", src:obj.src, natW:obj.natW, natH:obj.natH };
+}
+
+function resolveActiveShape(obj, frame){
+  const skfs = sortedShapeKeyframes(obj);
+  if(!skfs.length) return getShapeById(obj, "base");
+  const exact = skfs.find(k=>k.frame===frame);
+  if(exact) return getShapeById(obj, exact.shapeId);
+  return getShapeById(obj, "base");
+}
+
+function findObjectById(id){
+  return S.imageObjects.find(o=>o.id===id) || null;
+}
+
+function clearDanglingParents(objs){
+  const ids = new Set(objs.map(o=>o.id));
+  return objs.map(o => (o.parentId && !ids.has(o.parentId)) ? { ...o, parentId: null, parentBindFrame: null } : o);
+}
+
+function worldTransformAt(obj, frame, visited){
+  const local = objectTransformAt(obj, frame);
+  if(!local || !obj.parentId) return local;
+
+  visited = visited ? new Set(visited) : new Set();
+  if(visited.has(obj.id)) return local;
+  visited.add(obj.id);
+
+  const parentObj = findObjectById(obj.parentId);
+  if(!parentObj) return local;
+
+  const parentNow = worldTransformAt(parentObj, frame, visited);
+  const bindFrame = Number.isFinite(obj.parentBindFrame) ? obj.parentBindFrame : frame;
+  const parentBind = worldTransformAt(parentObj, bindFrame, visited);
+  if(!parentNow || !parentBind) return local;
+
+  const cxNow = (parentNow.x + parentNow.w/2)*STAGE_W;
+  const cyNow = (parentNow.y + parentNow.h/2)*STAGE_H;
+  const cxBind = (parentBind.x + parentBind.w/2)*STAGE_W;
+  const cyBind = (parentBind.y + parentBind.h/2)*STAGE_H;
+
+  const scaleW = parentBind.w>1e-6 ? parentNow.w/parentBind.w : 1;
+  const scaleH = parentBind.h>1e-6 ? parentNow.h/parentBind.h : 1;
+  const deltaRot = parentNow.rotation - parentBind.rotation;
+
+  const childCxPx = (local.x+local.w/2)*STAGE_W;
+  const childCyPx = (local.y+local.h/2)*STAGE_H;
+
+  let offX = (childCxPx - cxBind) * scaleW;
+  let offY = (childCyPx - cyBind) * scaleH;
+
+  const cos = Math.cos(deltaRot), sin = Math.sin(deltaRot);
+  const rotOffX = offX*cos - offY*sin;
+  const rotOffY = offX*sin + offY*cos;
+
+  const worldCxPx = cxNow + rotOffX;
+  const worldCyPx = cyNow + rotOffY;
+  const worldW = local.w*scaleW;
+  const worldH = local.h*scaleH;
+
+  return {
+    frame,
+    x: worldCxPx/STAGE_W - worldW/2,
+    y: worldCyPx/STAGE_H - worldH/2,
+    w: worldW,
+    h: worldH,
+    rotation: local.rotation + deltaRot,
+    opacity: local.opacity,
+    flipX: local.flipX,
+    flipY: local.flipY
+  };
+}
+
+function getParentAdjustFactors(obj, frame){
+  if(!obj.parentId) return { scaleW:1, scaleH:1, rotation:0 };
+  const parentObj = findObjectById(obj.parentId);
+  if(!parentObj) return { scaleW:1, scaleH:1, rotation:0 };
+  const bindFrame = Number.isFinite(obj.parentBindFrame) ? obj.parentBindFrame : frame;
+  const parentNow = worldTransformAt(parentObj, frame);
+  const parentBind = worldTransformAt(parentObj, bindFrame);
+  if(!parentNow || !parentBind) return { scaleW:1, scaleH:1, rotation:0 };
+  return {
+    scaleW: parentBind.w>1e-6 ? parentNow.w/parentBind.w : 1,
+    scaleH: parentBind.h>1e-6 ? parentNow.h/parentBind.h : 1,
+    rotation: parentNow.rotation - parentBind.rotation
+  };
+}
+
+let clipboardStrokes = null;
+let clipboardImageObject = null;
+
+const uid = () => Math.random().toString(36).slice(2,10);
+
+const emptyLayer = (name, frameCount) => ({
+  id: uid(),
+  name: name,
+  visible: true,
+  opacity: 1,
+  frames: Array.from({length: frameCount}, () => [])
+});
+
+const imageCache = new Map();
+
+function loadImage(src){
+  const cached = imageCache.get(src);
+  if(cached && cached.complete){
+    return Promise.resolve(cached);
+  }
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    img.onload = ()=>{ imageCache.set(src,img); resolve(img); };
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function pathStroke(ctx,s,sx,sy){
+  const p = s.pts;
+  if(!p || !p.length) return;
+  const a = p[0];
+  const b = p[p.length-1];
+
+  ctx.beginPath();
+
+  if(s.tool==="line" && p.length>1){
+    ctx.moveTo(a.x*sx,a.y*sy);
+    ctx.lineTo(b.x*sx,b.y*sy);
+  }
+  else if(s.tool==="rect" && p.length>1){
+    ctx.rect(a.x*sx, a.y*sy, (b.x-a.x)*sx, (b.y-a.y)*sy);
+  }
+  else if(s.tool==="ellipse" && p.length>1){
+    ctx.ellipse(
+      ((a.x+b.x)/2)*sx,
+      ((a.y+b.y)/2)*sy,
+      Math.abs(b.x-a.x)*sx*.5,
+      Math.abs(b.y-a.y)*sy*.5,
+      0, 0, Math.PI*2
+    );
+  }
+  else{
+    ctx.moveTo(a.x*sx,a.y*sy);
+    if(p.length===1){ ctx.lineTo(a.x*sx+.01, a.y*sy); }
+    for(let i=1; i<p.length; i++){
+      const prev = p[i-1];
+      const cur = p[i];
+      ctx.quadraticCurveTo(
+        prev.x*sx, prev.y*sy,
+        ((prev.x+cur.x)/2)*sx, ((prev.y+cur.y)/2)*sy
+      );
+    }
+  }
+  ctx.stroke();
+}
+
+function drawStrokes(ctx, strokes, w, h, alpha=1, tint){
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for(const s of strokes){
+    const isEraser = s.tool==="eraser";
+    ctx.globalAlpha = isEraser ? 1 : alpha*(s.opacity ?? 1);
+    ctx.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
+
+    if(s.tool==="image"){ continue; }
+
+    ctx.strokeStyle = isEraser ? "#fff" : (tint ?? s.color);
+    ctx.lineWidth = (s.size/1000)*w;
+
+    pathStroke(ctx, s, w, h);
+  }
+  ctx.restore();
+}
+
+let scratch = null;
+function scratchCtx(w,h){
+  if(!scratch){ scratch = document.createElement("canvas"); }
+  if(scratch.width!==w || scratch.height!==h){ scratch.width = w; scratch.height = h; }
+  const ctx = scratch.getContext("2d");
+  if(!ctx) return null;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0,0,w,h);
+  return ctx;
+}
+
+let onionScratch = null;
+function onionScratchCtx(w,h){
+  if(!onionScratch){ onionScratch = document.createElement("canvas"); }
+  if(onionScratch.width!==w || onionScratch.height!==h){ onionScratch.width = w; onionScratch.height = h; }
+  const ctx = onionScratch.getContext("2d");
+  if(!ctx) return null;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0,0,w,h);
+  return ctx;
+}
+
+function drawOnionLayer(ctx, layers, imageObjects, index, w, h, alpha, tint){
+  const octx = onionScratchCtx(w,h);
+  if(!octx){
+    for(const l of layers){
+      if(!l.visible) continue;
+      drawStrokes(ctx, l.frames[index] || [], w, h, alpha, tint);
+      drawImageObjectsForLayer(ctx, imageObjects, l.id, alpha, index, w, h);
+    }
+    return;
+  }
+  for(const l of layers){
+    if(!l.visible) continue;
+    drawStrokes(octx, l.frames[index] || [], w, h, 1);
+    drawImageObjectsForLayer(octx, imageObjects, l.id, 1, index, w, h);
+  }
+
+  if(tint){
+    octx.save();
+    octx.globalCompositeOperation = "source-atop";
+    octx.globalAlpha = 1;
+    octx.fillStyle = tint;
+    octx.fillRect(0,0,w,h);
+    octx.restore();
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(octx.canvas, 0, 0);
+  ctx.restore();
+}
+
+function drawImageObjectsForLayer(ctx, imageObjects, layerId, layerOpacity, frame, w, h){
+  imageObjects.forEach(o=>{
+    if(o.layerId!==layerId) return;
+    const t = worldTransformAt(o, frame);
+    if(!t) return;
+    const shape = resolveActiveShape(o, frame);
+    const img = imageCache.get(shape.src);
+    if(!img || !img.complete) return;
+
+    const cx = (t.x + t.w/2)*w;
+    const cy = (t.y + t.h/2)*h;
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = layerOpacity * Math.max(0, Math.min(1, t.opacity));
+    ctx.translate(cx, cy);
+    ctx.rotate(t.rotation);
+    ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
+    ctx.drawImage(img, -t.w*w/2, -t.h*h/2, t.w*w, t.h*h);
+    ctx.restore();
+  });
+}
+
+function renderFrame(ctx, layers, imageObjects, index, w, h, bg, live){
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+
+  const objs = imageObjects || [];
+
+  layers.forEach((l,li)=>{
+    if(!l.visible) return;
+    const strokes = [...(l.frames[index] || [])];
+    if(live && live.layer===li){ strokes.push(live.stroke); }
+
+    const octx = scratchCtx(w,h);
+    if(!octx){
+      drawStrokes(ctx, strokes, w, h, l.opacity);
+    } else {
+      drawStrokes(octx, strokes, w, h, 1);
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = l.opacity;
+      ctx.drawImage(octx.canvas, 0, 0);
+      ctx.restore();
+    }
+
+    drawImageObjectsForLayer(ctx, objs, l.id, l.opacity, index, w, h);
+  });
+}
+
+function drawSelectionBox(ctx, obj, w, h){
+  const t = worldTransformAt(obj, S.frame);
+  if(!t) return;
+
+  const cx = (t.x + t.w/2)*w;
+  const cy = (t.y + t.h/2)*h;
+  const hw = t.w*w/2;
+  const hh = t.h*h/2;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(t.rotation);
+
+  ctx.strokeStyle = "#e6a559";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6,4]);
+  ctx.strokeRect(-hw, -hh, hw*2, hh*2);
+  ctx.setLineDash([]);
+
+  const rY = -hh-30;
+  ctx.beginPath();
+  ctx.moveTo(0, -hh);
+  ctx.lineTo(0, rY);
+  ctx.stroke();
+
+  ctx.fillStyle = "#e6a559";
+  ctx.strokeStyle = "#2b1c0d";
+  ctx.lineWidth = 1.5;
+
+  ctx.beginPath();
+  ctx.arc(0, rY, 8, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(hw, hh, 8, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+}
+
+const S = {
+  layers: [emptyLayer("Layer 1", 1)],
+  imageObjects: [],
+  selectedObjectId: null,
+  activeLayer: 0,
+  frame: 0,
+  tool: "brush",
+  color: PALETTE[0],
+  brushSize: 6,
+  brushOpacity: 1,
+  eraserSize: 30,
+  fps: 12,
+  onion: true,
+  onionBefore: 1,
+  onionAfter: 1,
+  loop: true,
+  playing: false,
+  view: { z: 1, x: 0, y: 0 },
+  bg: "#ffffff",
+  audio: null
+};
+
+let past = [];
+let future = [];
+let pointers = new Map();
+let gesture = null;
+let drawing = null;
+let transformDrag = null;
+let playInterval = null;
+let autosaveTimer = 0;
+const exportState = { active: false };
+
+function frameCount(){
+  return S.layers[0] ? S.layers[0].frames.length : 1;
+}
+
+function commit(mutator){
+  past.push({
+    layers: JSON.parse(JSON.stringify(S.layers)),
+    imageObjects: cloneImageObjects(S.imageObjects)
+  });
+  if(past.length>40) past.shift();
+  future = [];
+
+  if(typeof mutator==="function"){
+    const result = mutator(S.layers, S.imageObjects);
+    if(Array.isArray(result)){
+      S.layers = result;
+    } else if(result && typeof result==="object"){
+      if(result.layers) S.layers = result.layers;
+      if(result.imageObjects) S.imageObjects = result.imageObjects;
+    }
+  } else {
+    S.layers = mutator;
+  }
+
+  autosave();
+  renderUndoRedo();
+}
+
+function undo(){
+  if(!past.length) return;
+  future.push({ layers: S.layers, imageObjects: S.imageObjects });
+  const prev = past.pop();
+  S.layers = prev.layers;
+  S.imageObjects = prev.imageObjects;
+  S.selectedObjectId = null;
+  autosave();
+  renderAll();
+}
+
+function redo(){
+  if(!future.length) return;
+  past.push({ layers: S.layers, imageObjects: S.imageObjects });
+  const next = future.pop();
+  S.layers = next.layers;
+  S.imageObjects = next.imageObjects;
+  S.selectedObjectId = null;
+  autosave();
+  renderAll();
+}
+
+function autosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(()=>{
+    try{
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+        layers: S.layers,
+        imageObjects: S.imageObjects,
+        fps: S.fps,
+        onionBefore: S.onionBefore,
+        onionAfter: S.onionAfter,
+        onion: S.onion,
+        savedAt: Date.now()
+      }));
+    }catch(e){}
+  }, 500);
+}
+
+function tryRestore(){
+  try{
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    if(data && Array.isArray(data.layers) && data.layers.length){
+      S.layers = data.layers;
+      S.imageObjects = Array.isArray(data.imageObjects) ? data.imageObjects : [];
+      S.imageObjects = S.imageObjects.map(o=>{
+        if(o.layerId) return o;
+        const lo = S.layers[o.layer];
+        return { ...o, layerId: lo ? lo.id : (S.layers[0] && S.layers[0].id) };
+      }).filter(o=>o.layerId);
+
+      S.imageObjects = S.imageObjects.map(o => ({
+        parentId: null, parentBindFrame: null, group: "",
+        shapes: [], shapeKeyframes: [],
+        ...o
+      }));
+      S.imageObjects = S.imageObjects.map(dedupeIdenticalKeyframes);
+      S.imageObjects = dedupeOverlappingImageObjects(S.imageObjects);
+      S.imageObjects = clearDanglingParents(S.imageObjects);
+
+      S.layers = S.layers.map(l => ({
+        ...l,
+        frames: l.frames.map(f => f.filter(s => s.tool!=="image"))
+      }));
+
+      if(data.fps) S.fps = data.fps;
+      if(typeof data.onion === "boolean") S.onion = data.onion;
+      if(Number.isFinite(data.onionBefore)) S.onionBefore = data.onionBefore;
+      if(Number.isFinite(data.onionAfter)) S.onionAfter = data.onionAfter;
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+const canvas = document.getElementById("canvas");
+const ctx2d = canvas.getContext("2d");
+const stageWrap = document.getElementById("stageWrap");
+
+function resizeCanvas(){
+  const wrapW = stageWrap.clientWidth;
+  const wrapH = stageWrap.clientHeight;
+  if(!wrapW || !wrapH) return;
+
+  const dpr = 1;
+
+  canvas.width = Math.round(STAGE_W * dpr);
+  canvas.height = Math.round(STAGE_H * dpr);
+
+  canvas.style.width = wrapW + "px";
+  canvas.style.height = wrapH + "px";
+
+  applyViewTransform();
+  paint();
+}
+
+function paint(){
+  const w = canvas.width;
+  const h = canvas.height;
+  if(!w || !h) return;
+
+  const live = drawing ? { layer: S.activeLayer, stroke: drawing } : null;
+  renderFrame(ctx2d, S.layers, S.imageObjects, S.frame, w, h, S.bg, live);
+
+  if(S.onion && !S.playing){
+    for(let k=1; k<=S.onionBefore; k++){
+      const i = S.frame-k;
+      if(i<0) break;
+      drawOnionLayer(ctx2d, S.layers, S.imageObjects, i, w, h, .3/k, "#4aa8ff");
+    }
+    for(let k=1; k<=S.onionAfter; k++){
+      const i = S.frame+k;
+      if(i>frameCount()-1) break;
+      drawOnionLayer(ctx2d, S.layers, S.imageObjects, i, w, h, .24/k, "#ff5d73");
+    }
+  }
+
+  if(S.tool==="select" && !S.playing){
+    const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+    if(obj) drawSelectionBox(ctx2d, obj, w, h);
+  }
+}
+
+try{
+  new ResizeObserver(resizeCanvas).observe(stageWrap);
+}catch(e){
+  console.error("ResizeObserver সাপোর্ট নেই, window resize দিয়ে fallback করা হচ্ছে:", e);
+  window.addEventListener("resize", resizeCanvas);
+}
+
+function applyViewTransform(){
+  canvas.style.transformOrigin = "center center";
+  canvas.style.transform = `translate(${S.view.x}px, ${S.view.y}px) scale(${S.view.z})`;
+}
+
+function startPlayback(){
+  clearInterval(playInterval);
+  const interval = 1000 / S.fps;
+
+  playInterval = setInterval(() => {
+    if(!S.playing) { clearInterval(playInterval); return; }
+
+    let nextFrame = S.frame + 1;
+    if(nextFrame >= frameCount()){
+      if(!S.loop){
+        S.playing = false;
+        clearInterval(playInterval);
+        renderPlayButton();
+        return;
+      }
+      nextFrame = 0;
+      if(S.audio){
+        const audioEl = document.getElementById("audioEl");
+        audioEl.currentTime = 0;
+        if(S.playing) audioEl.play().catch(()=>{});
+      }
+    }
+
+    S.frame = nextFrame;
+    paint();
+    updateFrameCounter();
+    updateTimelineActive();
+  }, interval);
+}
+
+function stopPlayback(){
+  clearInterval(playInterval);
+}
+
+function posFromEvent(e){
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width;
+  const y = (e.clientY - r.top) / r.height;
+  return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+}
+
+function pxFromEvent(e){
+  const n = posFromEvent(e);
+  return { x: n.x*canvas.width, y: n.y*canvas.height };
+}
+
+function getOrCreateKeyframeAtCurrentFrame(obj){
+  let kf = obj.keyframes.find(k=>k.frame===S.frame);
+  if(kf) return kf;
+
+  if(obj.keyframes.length===1){
+    return obj.keyframes[0];
+  }
+
+  const t = objectTransformAt(obj, S.frame);
+  kf = { frame:S.frame, x:t.x, y:t.y, w:t.w, h:t.h, rotation:t.rotation, opacity:t.opacity, flipX: !!t.flipX, flipY: !!t.flipY, easing:"linear" };
+  obj.keyframes.push(kf);
+  return kf;
+}
+
+function objectHitTest(obj, pxPoint){
+  const t = worldTransformAt(obj, S.frame);
+  if(!t) return null;
+  const w = canvas.width, h = canvas.height;
+  const cx = (t.x + t.w/2)*w;
+  const cy = (t.y + t.h/2)*h;
+  const hw = t.w*w/2;
+  const hh = t.h*h/2;
+
+  const dx = pxPoint.x - cx;
+  const dy = pxPoint.y - cy;
+  const cos = Math.cos(-t.rotation);
+  const sin = Math.sin(-t.rotation);
+  const lx = dx*cos - dy*sin;
+  const ly = dx*sin + dy*cos;
+
+  const HR = 24;
+  if(Math.hypot(lx-hw, ly-hh) <= HR) return "scale";
+  const rY = -hh-30;
+  if(Math.hypot(lx-0, ly-rY) <= HR) return "rotate";
+  if(Math.abs(lx)<=hw && Math.abs(ly)<=hh) return "move";
+  return null;
+}
+
+function applyDragUpdate(drag, p){
+  const kf = drag.kf;
+  const w = canvas.width, h = canvas.height;
+
+  if(drag.mode==="move"){
+    let dxPx = p.x - drag.startPointer.x;
+    let dyPx = p.y - drag.startPointer.y;
+    const pa = drag.parentAdjust;
+    if(pa && (pa.rotation || pa.scaleW!==1 || pa.scaleH!==1)){
+      const cos = Math.cos(-pa.rotation), sin = Math.sin(-pa.rotation);
+      const ux = dxPx*cos - dyPx*sin;
+      const uy = dxPx*sin + dyPx*cos;
+      dxPx = pa.scaleW ? ux/pa.scaleW : ux;
+      dyPx = pa.scaleH ? uy/pa.scaleH : uy;
+    }
+    kf.x = drag.startTransform.x + dxPx/w;
+    kf.y = drag.startTransform.y + dyPx/h;
+  }
+  else if(drag.mode==="scale"){
+    const curDist = Math.hypot(p.x-drag.centerPx.x, p.y-drag.centerPx.y) || 1;
+    const ratio = Math.max(0.05, curDist/drag.startDist);
+    const newW = Math.max(0.02, drag.startTransform.w*ratio);
+    const newH = Math.max(0.02, drag.startTransform.h*ratio);
+    const cx = drag.startTransform.x + drag.startTransform.w/2;
+    const cy = drag.startTransform.y + drag.startTransform.h/2;
+    kf.w = newW; kf.h = newH;
+    kf.x = cx - newW/2;
+    kf.y = cy - newH/2;
+  }
+  else if(drag.mode==="rotate"){
+    const startAng = Math.atan2(drag.startPointer.y-drag.centerPx.y, drag.startPointer.x-drag.centerPx.x);
+    const curAng = Math.atan2(p.y-drag.centerPx.y, p.x-drag.centerPx.x);
+    kf.rotation = drag.startTransform.rotation + (curAng-startAng);
+  }
+}
+
+canvas.addEventListener("pointerdown", e=>{
+  e.preventDefault();
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if(pointers.size >= 2){
+    drawing = null;
+    transformDrag = null;
+    const vals = [...pointers.values()];
+    const a = vals[0], b = vals[1];
+    if(a && b){
+      gesture = { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x)/2, cy: (a.y + b.y)/2 };
+    }
+    paint();
+    return;
+  }
+
+  if(S.playing) return;
+
+  if(S.tool === "select"){
+    const p = pxFromEvent(e);
+    const activeLayerId = S.layers[S.activeLayer] ? S.layers[S.activeLayer].id : null;
+    let hitObj = null, hitMode = null;
+
+    const selected = S.imageObjects.find(o=>o.id===S.selectedObjectId && o.layerId===activeLayerId);
+    if(selected){
+      const mode = objectHitTest(selected, p);
+      if(mode){ hitObj = selected; hitMode = mode; }
+    }
+
+    if(!hitObj){
+      for(let i=S.imageObjects.length-1; i>=0; i--){
+        const obj = S.imageObjects[i];
+        if(obj.layerId !== activeLayerId) continue;
+        const layerObj = S.layers[S.activeLayer];
+        if(!layerObj || !layerObj.visible) continue;
+        if(objectHitTest(obj, p)==="move"){ hitObj = obj; hitMode = "move"; break; }
+      }
+    }
+
+    if(hitObj){
+      const preState = { layers: S.layers, imageObjects: cloneImageObjects(S.imageObjects) };
+
+      S.selectedObjectId = hitObj.id;
+
+      const kf = getOrCreateKeyframeAtCurrentFrame(hitObj);
+      const w = canvas.width, h = canvas.height;
+      const worldNow = worldTransformAt(hitObj, S.frame) || kf;
+      const centerPx = { x:(worldNow.x+worldNow.w/2)*w, y:(worldNow.y+worldNow.h/2)*h };
+      const startDist = Math.hypot(p.x-centerPx.x, p.y-centerPx.y) || 1;
+      const parentAdjust = getParentAdjustFactors(hitObj, S.frame);
+
+      transformDrag = {
+        objId: hitObj.id, mode: hitMode, kf,
+        startPointer: p,
+        startTransform: { x:kf.x, y:kf.y, w:kf.w, h:kf.h, rotation:kf.rotation },
+        centerPx, startDist, preState, parentAdjust
+      };
+      canvas.setPointerCapture(e.pointerId);
+    } else {
+      S.selectedObjectId = null;
+    }
+    renderAll();
+    return;
+  }
+
+  canvas.setPointerCapture(e.pointerId);
+
+  let currentSize = S.brushSize;
+  let currentOpacity = S.brushOpacity;
+  if(S.tool === "eraser"){
+    currentSize = S.eraserSize;
+    currentOpacity = 1;
+  }
+
+  drawing = {
+    id: uid(), tool: S.tool, color: S.color, size: currentSize, opacity: currentOpacity,
+    pts: [posFromEvent(e)]
+  };
+
+  paint();
+}, { passive: false });
+
+canvas.addEventListener("pointermove", e=>{
+  e.preventDefault();
+  if(pointers.has(e.pointerId)){ pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); }
+
+  if(pointers.size >= 2){
+    const vals = [...pointers.values()];
+    const a = vals[0], b = vals[1];
+    if(!a || !b || !gesture) return;
+
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    const cx = (a.x + b.x)/2;
+    const cy = (a.y + b.y)/2;
+    const v = S.view;
+    const z = Math.min(10, Math.max(1, v.z * (dist/(gesture.dist || dist))));
+
+    S.view.z = z;
+    S.view.x += (cx - gesture.cx);
+    S.view.y += (cy - gesture.cy);
+
+    gesture = { dist, cx, cy };
+    applyViewTransform();
+    return;
+  }
+
+  if(transformDrag){
+    applyDragUpdate(transformDrag, pxFromEvent(e));
+    paint();
+    return;
+  }
+
+  if(!drawing) return;
+  drawing.pts.push(posFromEvent(e));
+  paint();
+}, { passive: false });
+
+function onPointerUp(e){
+  pointers.delete(e.pointerId);
+  if(pointers.size < 2) gesture = null;
+
+  if(transformDrag){
+    past.push(transformDrag.preState);
+    if(past.length>40) past.shift();
+    future = [];
+    transformDrag = null;
+    autosave();
+    renderUndoRedo();
+    renderObjectPanel();
+    paint();
+    return;
+  }
+
+  const d = drawing;
+  drawing = null;
+  if(!d) return;
+
+  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
+    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, d] : f)
+  } : l));
+
+  renderTimeline();
+  paint();
+}
+
+canvas.addEventListener("pointerup", onPointerUp);
+canvas.addEventListener("pointercancel", onPointerUp);
+
+stageWrap.addEventListener("wheel", e=>{
+  e.preventDefault();
+  const dy = e.deltaY * (e.deltaMode===1 ? 16 : e.deltaMode===2 ? 100 : 1);
+  const v = S.view;
+  const z = Math.min(10, Math.max(1, v.z * Math.exp(-dy*.0015)));
+
+  S.view.z = z;
+  applyViewTransform();
+}, { passive: false });
+
+function mutateFrames(fn){
+  commit(ls => ls.map(l => ({ ...l, frames: fn(l.frames) })));
+}
+
+function addFrame(){
+  const f = S.frame;
+  mutateFrames(frames => [...frames.slice(0, f+1), [], ...frames.slice(f+1)]);
+  S.frame = f+1;
+  renderAll();
+}
+
+function duplicateFrame(){
+  const f = S.frame;
+  mutateFrames(frames => [
+    ...frames.slice(0, f+1),
+    (frames[f]||[]).map(s => ({ ...s, id: uid() })),
+    ...frames.slice(f+1)
+  ]);
+  S.frame = f+1;
+  renderAll();
+}
+
+function copyCurrentFrame(){
+  if(S.tool==="select"){
+    const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+    if(!obj){ alert("কপি করার মতো কোনো ছবি সিলেক্ট করা নেই!"); return; }
+    const t = objectTransformAt(obj, S.frame);
+    clipboardImageObject = {
+      src: obj.src, natW: obj.natW, natH: obj.natH,
+      transform: { x:t.x, y:t.y, w:t.w, h:t.h, rotation:t.rotation, opacity:t.opacity, flipX: !!t.flipX, flipY: !!t.flipY }
+    };
+    alert("ছবি কপি করা হয়েছে!");
+    return;
+  }
+
+  const activeL = S.layers[S.activeLayer];
+  if(!activeL) return;
+  const currentStrokes = activeL.frames[S.frame] || [];
+  if(!currentStrokes.length){ alert("কপি করার মতো কিছু নেই!"); return; }
+  clipboardStrokes = JSON.parse(JSON.stringify(currentStrokes));
+  alert("ড্রয়িং কপি করা হয়েছে!");
+}
+
+function pasteToCurrentFrame(){
+  if(S.tool==="select"){
+    if(!clipboardImageObject){ alert("কপি করার মতো কোনো ছবি নেই!"); return; }
+    const activeL = S.layers[S.activeLayer];
+    if(!activeL) return;
+
+    const c = clipboardImageObject;
+    const objId = uid();
+    const newObj = {
+      id: objId, layerId: activeL.id, src: c.src, natW: c.natW, natH: c.natH,
+      parentId: null, parentBindFrame: null, group: "",
+      shapes: [], shapeKeyframes: [],
+      keyframes: [{ frame:S.frame, ...c.transform, easing:"linear" }]
+    };
+
+    commit((ls, objs) => ({ imageObjects: [...objs, newObj] }));
+    S.selectedObjectId = objId;
+    renderAll();
+    return;
+  }
+
+  if(!clipboardStrokes || !clipboardStrokes.length){ alert("কপি করার মতো কিছু নেই!"); return; }
+  const pasted = clipboardStrokes.map(s => ({ ...s, id: uid() }));
+  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
+    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, ...pasted] : f)
+  } : l));
+  renderAll();
+}
+
+function deleteFrame(){
+  if(frameCount()<=1){ mutateFrames(() => [[]]); renderAll(); return; }
+  const f = S.frame;
+  mutateFrames(frames => frames.filter((_,i) => i!==f));
+  S.frame = Math.max(0, f-1);
+  renderAll();
+}
+
+function clearFrame(){
+  if(S.tool==="select"){
+    const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+    if(!obj){ alert("ক্লিয়ার করার মতো কোনো ছবি সিলেক্ট করা নেই!"); return; }
+
+    const hasShapeHere = (obj.shapeKeyframes||[]).some(k=>k.frame===S.frame);
+    if(hasShapeHere){
+      commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
+        ...o, shapeKeyframes: (o.shapeKeyframes||[]).filter(k=>k.frame!==S.frame)
+      }) }));
+      renderAll();
+      return;
+    }
+
+    alert("এই ফ্রেমে মোছার মতো কোনো শেপ-অ্যাসাইন নেই। পুরো object মুছতে চাইলে নিচের 'Delete Object' বাটন ব্যবহার করো।");
+    return;
+  }
+
+  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
+    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [] : f)
+  } : l));
+  renderAll();
+}
+
+async function detectAlphaContentBox(img){
+  const DET_MAX = 256;
+  const scale = Math.min(1, DET_MAX/Math.max(img.naturalWidth, img.naturalHeight));
+  const dw = Math.max(1, Math.round(img.naturalWidth*scale));
+  const dh = Math.max(1, Math.round(img.naturalHeight*scale));
+
+  const c = document.createElement("canvas");
+  c.width = dw; c.height = dh;
+  const cctx = c.getContext("2d");
+  cctx.drawImage(img, 0, 0, dw, dh);
+
+  let data;
+  try{ data = cctx.getImageData(0, 0, dw, dh).data; }catch(e){ return null; }
+
+  const TH = 10;
+  let minX=dw, minY=dh, maxX=-1, maxY=-1;
+  for(let y=0; y<dh; y++){
+    for(let x=0; x<dw; x++){
+      const a = data[(y*dw+x)*4+3];
+      if(a>TH){
+        if(x<minX) minX=x;
+        if(x>maxX) maxX=x;
+        if(y<minY) minY=y;
+        if(y>maxY) maxY=y;
+      }
+    }
+  }
+  if(maxX<minX || maxY<minY) return null;
+
+  return { x0: minX/dw, y0: minY/dh, x1: (maxX+1)/dw, y1: (maxY+1)/dh };
+}
+
+async function processImportedImage(file){
+  const rawSrc = await new Promise((res,rej)=>{
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result));
+    fr.onerror = rej;
+    fr.readAsDataURL(file);
+  });
+
+  const rawImg = await loadImage(rawSrc);
+
+  const MAX_DIM = STAGE_W * 2;
+  let targetW = rawImg.naturalWidth;
+  let targetH = rawImg.naturalHeight;
+  if(Math.max(targetW, targetH) > MAX_DIM){
+    const scale = MAX_DIM / Math.max(targetW, targetH);
+    targetW = Math.max(1, Math.round(targetW*scale));
+    targetH = Math.max(1, Math.round(targetH*scale));
+  }
+
+  let src = rawSrc;
+  if(targetW !== rawImg.naturalWidth || targetH !== rawImg.naturalHeight){
+    const off = document.createElement("canvas");
+    off.width = targetW;
+    off.height = targetH;
+    const octx = off.getContext("2d");
+    octx.drawImage(rawImg, 0, 0, targetW, targetH);
+    const usePng = file.type === "image/png";
+    src = usePng ? off.toDataURL("image/png") : off.toDataURL("image/jpeg", 0.9);
+  }
+
+  let img = await loadImage(src);
+
+  if(file.type === "image/png"){
+    try{
+      const box = await detectAlphaContentBox(img);
+      if(box){
+        const padL = box.x0, padT = box.y0, padR = 1-box.x1, padB = 1-box.y1;
+        const hasMeaningfulPadding = (padL+padR) > 0.02 || (padT+padB) > 0.02;
+        if(hasMeaningfulPadding){
+          const cropX = Math.round(box.x0*img.naturalWidth);
+          const cropY = Math.round(box.y0*img.naturalHeight);
+          const cropW = Math.max(1, Math.round((box.x1-box.x0)*img.naturalWidth));
+          const cropH = Math.max(1, Math.round((box.y1-box.y0)*img.naturalHeight));
+
+          const cropCanvas = document.createElement("canvas");
+          cropCanvas.width = cropW;
+          cropCanvas.height = cropH;
+          const cropCtx = cropCanvas.getContext("2d");
+          cropCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+          const trimmedSrc = cropCanvas.toDataURL("image/png");
+          const trimmedImg = await loadImage(trimmedSrc);
+          src = trimmedSrc;
+          img = trimmedImg;
+        }
+      }
+    }catch(e){
+      console.error("Transparent padding trim ব্যর্থ হয়েছে, আসল ছবি দিয়েই এগোনো হচ্ছে:", e);
+    }
+  }
+
+  return { src, natW: img.naturalWidth, natH: img.naturalHeight };
+}
+
+async function importPhoto(file){
+  if(!file) return;
+  const { src, natW, natH } = await processImportedImage(file);
+
+  const ar = natW/natH;
+  const stageAr = STAGE_W/STAGE_H;
+  let w = 1, h = 1;
+
+  if(ar > stageAr) h = stageAr/ar;
+  else w = ar/stageAr;
+
+  const x = (1-w)/2;
+  const y = (1-h)/2;
+
+  const objId = uid();
+  const newObj = {
+    id: objId,
+    layerId: S.layers[S.activeLayer].id,
+    src, natW, natH,
+    parentId: null, parentBindFrame: null, group: "",
+    shapes: [], shapeKeyframes: [],
+    keyframes: [ { frame: S.frame, x, y, w, h, rotation: 0, opacity: 1, flipX: false, flipY: false, easing: "linear" } ]
+  };
+
+  commit((ls, objs) => ({ imageObjects: [...objs, newObj] }));
+
+  S.selectedObjectId = objId;
+  S.tool = "select";
+  renderAll();
+}
+
+let pendingShapeTargetObjId = null;
+
+async function addShapeToLibrary(obj, file){
+  if(!file) return;
+  const { src, natW, natH } = await processImportedImage(file);
+  await loadImage(src);
+  const shapeId = uid();
+  commit((ls, objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
+    ...o, shapes: [...(o.shapes||[]), { id: shapeId, src, natW, natH }]
+  }) }));
+  renderAll();
+}
+
+function assignShapeToCurrentFrame(obj, shapeId){
+  commit((ls, objs) => ({ imageObjects: objs.map(o => {
+    if(o.id!==obj.id) return o;
+    const kept = (o.shapeKeyframes||[]).filter(k=>k.frame!==S.frame);
+    return { ...o, shapeKeyframes: [...kept, { frame: S.frame, shapeId }] };
+  }) }));
+  renderAll();
+}
+
+function removeShapeFromLibrary(obj, shapeId){
+  commit((ls, objs) => ({ imageObjects: objs.map(o => {
+    if(o.id!==obj.id) return o;
+    return {
+      ...o,
+      shapes: (o.shapes||[]).filter(s=>s.id!==shapeId),
+      shapeKeyframes: (o.shapeKeyframes||[]).filter(k=>k.shapeId!==shapeId)
+    };
+  }) }));
+  renderAll();
+}
+
+const AUDIO_VOICE_THRESHOLD = 0.02;
+
+async function importAudioFile(file){
+  if(!file) return;
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if(!AudioCtx){ alert("এই ব্রাউজারে অডিও প্রসেসিং সাপোর্ট করে না।"); return; }
+
+  const arrayBuf = await file.arrayBuffer();
+  const actx = new AudioCtx();
+  let decoded;
+  try{
+    decoded = await actx.decodeAudioData(arrayBuf);
+  }catch(e){
+    alert("অডিও ফাইলটি পড়া যায়নি: " + (e && e.message ? e.message : String(e)));
+    return;
+  }
+
+  const chCount = decoded.numberOfChannels;
+  const len = decoded.length;
+  const mono = new Float32Array(len);
+  for(let c=0; c<chCount; c++){
+    const chData = decoded.getChannelData(c);
+    for(let i=0; i<len; i++) mono[i] += chData[i]/chCount;
+  }
+
+  if(S.audio && S.audio.objectUrl){
+    URL.revokeObjectURL(S.audio.objectUrl);
+  }
+  const objectUrl = URL.createObjectURL(file);
+
+  S.audio = {
+    src: objectUrl, objectUrl, fileName: file.name, samples: mono,
+    sampleRate: decoded.sampleRate, duration: decoded.duration
+  };
+
+  const audioEl = document.getElementById("audioEl");
+  audioEl.muted = false;
+  audioEl.volume = 1;
+  audioEl.src = objectUrl;
+  audioEl.load();
+
+  renderAll();
+}
+
+function removeAudio(){
+  if(S.audio && S.audio.objectUrl){
+    URL.revokeObjectURL(S.audio.objectUrl);
+  }
+  S.audio = null;
+  const audioEl = document.getElementById("audioEl");
+  audioEl.pause();
+  audioEl.removeAttribute("src");
+  audioEl.load();
+  renderAll();
+}
+
+function audioAmplitudeForFrame(frameIndex){
+  if(!S.audio || !S.audio.samples || !S.audio.samples.length) return 0;
+  const sr = S.audio.sampleRate;
+  const startT = frameIndex / S.fps;
+  const endT = (frameIndex+1) / S.fps;
+  const startIdx = Math.max(0, Math.floor(startT*sr));
+  const endIdx = Math.min(S.audio.samples.length, Math.ceil(endT*sr));
+  if(endIdx <= startIdx) return 0;
+
+  const span = endIdx - startIdx;
+  const maxSamplesToCheck = 300;
+  const step = Math.max(1, Math.floor(span/maxSamplesToCheck));
+
+  let sumSq = 0, count = 0;
+  for(let i=startIdx; i<endIdx; i+=step){
+    const v = S.audio.samples[i];
+    sumSq += v*v;
+    count++;
+  }
+  return count ? Math.sqrt(sumSq/count) : 0;
+}
+
+function syncAudioToFrame(){
+  if(!S.audio) return;
+  const audioEl = document.getElementById("audioEl");
+  if(S.playing) return;
+  const t = S.frame / S.fps;
+  if(Math.abs(audioEl.currentTime - t) > 0.03){
+    try{ audioEl.currentTime = Math.min(t, audioEl.duration || t); }catch(e){}
+  }
+}
+
+function setActiveLayer(li){
+  S.activeLayer = li;
+  const activeId = S.layers[li] ? S.layers[li].id : null;
+  const sel = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+  if(sel && sel.layerId !== activeId){ S.selectedObjectId = null; }
+}
+
+function addLayer(){
+  const prevLen = S.layers.length;
+  commit(ls => [...ls, emptyLayer(`Layer ${ls.length+1}`, frameCount())]);
+  setActiveLayer(prevLen);
+  renderAll();
+}
+
+function toggleLayer(i){
+  commit(ls => ls.map((l,li) => li===i ? { ...l, visible: !l.visible } : l));
+  renderAll();
+}
+
+function setLayerOpacity(i,v){
+  S.layers = S.layers.map((l,li) => li===i ? { ...l, opacity: v } : l);
+  autosave();
+  paint();
+}
+
+function moveLayer(i,dir){
+  const j = i+dir;
+  if(j<0 || j>=S.layers.length) return;
+  commit(ls => {
+    const copy = [...ls];
+    const a = copy[i];
+    copy[i] = copy[j];
+    copy[j] = a;
+    return copy;
+  });
+  setActiveLayer(j);
+  renderAll();
+}
+
+function removeLayer(i){
+  if(S.layers.length===1) return;
+  const removedId = S.layers[i] ? S.layers[i].id : null;
+  commit((ls, objs) => ({
+    layers: ls.filter((_,li) => li!==i),
+    imageObjects: clearDanglingParents(objs.filter(o => o.layerId!==removedId))
+  }));
+  setActiveLayer(Math.min(S.activeLayer, S.layers.length-2));
+  renderAll();
+}
+
+function exportPng(){
+  const off = document.createElement("canvas");
+  off.width = STAGE_W;
+  off.height = STAGE_H;
+  const ctx = off.getContext("2d");
+  if(!ctx) return;
+
+  renderFrame(ctx, S.layers, S.imageObjects, S.frame, STAGE_W, STAGE_H, S.bg);
+
+  const a = document.createElement("a");
+  a.href = off.toDataURL("image/png");
+  a.download = `youtube-frame-${S.frame+1}.png`;
+  a.click();
+}
+
+async function exportVideo(scale){
+  if(exportState.active) return;
+  const w = STAGE_W*scale;
+  const h = STAGE_H*scale;
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  const ctx = off.getContext("2d");
+  if(!ctx) return;
+
+  if(!off.captureStream){ alert("এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট করে না।"); return; }
+
+  const videoStream = off.captureStream(S.fps);
+
+  let exportAudioCtx = null;
+  let exportAudioSource = null;
+  let combinedStream = videoStream;
+
+  if(S.audio && S.audio.samples && S.audio.samples.length){
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(AudioCtx){
+      exportAudioCtx = new AudioCtx();
+      const buffer = exportAudioCtx.createBuffer(1, S.audio.samples.length, S.audio.sampleRate);
+      buffer.copyToChannel(S.audio.samples, 0);
+
+      exportAudioSource = exportAudioCtx.createBufferSource();
+      exportAudioSource.buffer = buffer;
+
+      const destNode = exportAudioCtx.createMediaStreamDestination();
+      exportAudioSource.connect(destNode);
+
+      combinedStream = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...destNode.stream.getAudioTracks()
+      ]);
+    }
+  }
+
+  const hasAudioTrack = combinedStream.getAudioTracks().length>0;
+  const mimeCandidates = hasAudioTrack ? [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm"
+  ] : [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm"
+  ];
+  const mime = mimeCandidates.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
+
+  if(!mime){ alert("এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট করে না।"); return; }
+
+  const rec = new MediaRecorder(combinedStream, {
+    mimeType: mime, videoBitsPerSecond: scale===1 ? 20000000 : 8000000
+  });
+
+  const chunks = [];
+  rec.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+  const done = new Promise(res => rec.onstop = () => res());
+
+  rec.start();
+  exportState.active = true;
+  showExportOverlay(hasAudioTrack ? "রেন্ডার হচ্ছে (অডিও সহ)…" : "রেন্ডার হচ্ছে…");
+
+  S.playing = false;
+  stopPlayback();
+  renderPlayButton();
+  const previewAudioEl = document.getElementById("audioEl");
+  if(previewAudioEl) previewAudioEl.pause();
+
+  if(exportAudioSource){
+    try{ exportAudioSource.start(0); }catch(e){}
+  }
+
+  for(let i=0; i<frameCount(); i++){
+    renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
+    showExportOverlay(`রেন্ডার হচ্ছে ${i+1}/${frameCount()}`);
+    await new Promise(r => setTimeout(r, Math.max(1000/S.fps, 40)));
+  }
+
+  await new Promise(r => setTimeout(r, 200));
+  rec.stop();
+  await done;
+
+  if(exportAudioSource){
+    try{ exportAudioSource.stop(); }catch(e){}
+  }
+  if(exportAudioCtx){
+    try{ exportAudioCtx.close(); }catch(e){}
+  }
+
+  const blob = new Blob(chunks, { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = scale===1 ? "youtube-animation-4k.webm" : "youtube-animation-1080p.webm";
+  a.click();
+
+  exportState.active = false;
+  hideExportOverlay();
+}
+
+function showExportOverlay(label){
+  document.getElementById("exportLabel").textContent = label;
+  document.getElementById("exportOverlay").classList.remove("hidden");
+}
+
+function hideExportOverlay(){
+  document.getElementById("exportOverlay").classList.add("hidden");
+}
+
+const el = (tag, cls, html) => {
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(html!==undefined) e.innerHTML = html;
+  return e;
+};
+
+function attachStepper(rangeEl){
+  const min = rangeEl.min !== "" ? Number(rangeEl.min) : -Infinity;
+  const max = rangeEl.max !== "" ? Number(rangeEl.max) : Infinity;
+  const step = 1;
+
+  const row = el("div", "stepper-row");
+
+  const minusBtn = el("button", "chip stepper-btn", "−");
+  minusBtn.type = "button";
+
+  const numInput = document.createElement("input");
+  numInput.type = "number";
+  numInput.className = "stepper-input";
+  numInput.step = step;
+  if(rangeEl.min !== "") numInput.min = rangeEl.min;
+  if(rangeEl.max !== "") numInput.max = rangeEl.max;
+  numInput.value = rangeEl.value;
+
+  const plusBtn = el("button", "chip stepper-btn", "+");
+  plusBtn.type = "button";
+
+  function clamp(v){
+    if(Number.isNaN(v)) v = Number(rangeEl.value) || 0;
+    return Math.min(max, Math.max(min, v));
+  }
+
+  function pushToRange(v){
+    rangeEl.value = String(clamp(v));
+    numInput.value = rangeEl.value;
+    rangeEl.dispatchEvent(new Event("input", { bubbles:true }));
+  }
+
+  minusBtn.onclick = () => pushToRange(Number(rangeEl.value) - step);
+  plusBtn.onclick = () => pushToRange(Number(rangeEl.value) + step);
+
+  numInput.onchange = () => pushToRange(Number(numInput.value));
+  numInput.addEventListener("keydown", e => {
+    if(e.key==="Enter"){ e.preventDefault(); numInput.blur(); }
+  });
+
+  rangeEl.addEventListener("input", () => { numInput.value = rangeEl.value; });
+
+  row.appendChild(minusBtn);
+  row.appendChild(numInput);
+  row.appendChild(plusBtn);
+  return row;
+}
+
+let showColorPickerDropdown = false;
+let showSettingsDropdown = false;
+let showLayerPopupMenu = false;
+let showFpsDropdown = false;
+let showOnionDropdown = false;
+
+function buildQuickShapeThumb(shape, isActive, obj){
+  const thumb = el("button", `icon-btn quick-shape-thumb${isActive ? " icon-btn-accent" : ""}`);
+  const img = document.createElement("img");
+  img.src = shape.src;
+  img.alt = "";
+  thumb.appendChild(img);
+  thumb.title = shape.id==="base" ? "মূল শেপ" : "শেপ";
+  thumb.onclick = () => assignShapeToCurrentFrame(obj, shape.id);
+  return thumb;
+}
+
+function renderShapeQuickStrip(rail, obj){
+  const activeShape = resolveActiveShape(obj, S.frame);
+
+  rail.appendChild(buildQuickShapeThumb({ id:"base", src:obj.src }, activeShape.id==="base", obj));
+
+  (obj.shapes||[]).forEach(s => {
+    rail.appendChild(buildQuickShapeThumb(s, activeShape.id===s.id, obj));
+  });
+
+  const addBtn = el("button", "icon-btn", "+");
+  addBtn.setAttribute("aria-label", "নতুন শেপ যোগ করো");
+  addBtn.title = "নতুন শেপ যোগ করো";
+  addBtn.onclick = () => {
+    pendingShapeTargetObjId = obj.id;
+    document.getElementById("shapeInput").click();
+  };
+  rail.appendChild(addBtn);
+}
+
+function renderToolRail(){
+  const rail = document.getElementById("toolRail");
+  rail.innerHTML = "";
+
+  const selectedObj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+  if(S.tool === "select" && selectedObj){
+    rail.classList.add("tool-rail--shapes");
+    renderShapeQuickStrip(rail, selectedObj);
+    return;
+  }
+  rail.classList.remove("tool-rail--shapes");
+
+  TOOLS.forEach(t => {
+    if(t.id === "settings") {
+      const settingsWrap = el("div", "tool-item");
+      const settingsBtn = el("button", "icon-btn", t.icon);
+      settingsBtn.setAttribute("aria-label", t.label);
+      settingsBtn.onclick = (e) => {
+        e.stopPropagation();
+        showSettingsDropdown = !showSettingsDropdown;
+        showColorPickerDropdown = false;
+        renderToolRail();
+      };
+      settingsWrap.appendChild(settingsBtn);
+
+      const settingsDropdown = el("div", `color-picker-dropdown${showSettingsDropdown ? "" : " hidden"}`);
+      settingsDropdown.style.width = "210px";
+      settingsDropdown.appendChild(buildDrawPanelContents());
+      settingsWrap.appendChild(settingsDropdown);
+      rail.appendChild(settingsWrap);
+    }
+    else if(t.id === "brush") {
+      const wrap = el("div", "tool-item");
+      const b = el("button", `icon-btn${S.tool===t.id ? " icon-btn-accent" : ""}`, t.icon);
+      b.setAttribute("aria-label", t.label);
+      b.onclick = () => { S.tool = t.id; showColorPickerDropdown = false; renderAll(); };
+      wrap.appendChild(b);
+
+      const colorBtn = el("button", "icon-btn");
+      colorBtn.style.width = "1.8rem";
+      colorBtn.style.height = "1.8rem";
+      colorBtn.style.marginLeft = "0.2rem";
+      colorBtn.style.background = S.color;
+      colorBtn.setAttribute("aria-label", "Color Palette");
+      colorBtn.onclick = (e) => {
+        e.stopPropagation();
+        showColorPickerDropdown = !showColorPickerDropdown;
+        showSettingsDropdown = false;
+        renderToolRail();
+      };
+      wrap.appendChild(colorBtn);
+
+      const dropdown = el("div", `color-picker-dropdown${showColorPickerDropdown ? "" : " hidden"}`);
+      const row = el("div", "swatch-row");
+      PALETTE.forEach(c => {
+        const sw = el("button", `swatch${S.color===c ? " swatch-on" : ""}`);
+        sw.style.background = c;
+        sw.onclick = () => { S.color = c; showColorPickerDropdown = false; renderToolRail(); renderAll(); };
+        row.appendChild(sw);
+      });
+      dropdown.appendChild(row);
+
+      wrap.appendChild(dropdown);
+      rail.appendChild(wrap);
+    } else {
+      const b = el("button", `icon-btn${S.tool===t.id ? " icon-btn-accent" : ""}`, t.icon);
+      b.setAttribute("aria-label", t.label);
+      b.onclick = () => { S.tool = t.id; showColorPickerDropdown = false; showSettingsDropdown = false; renderAll(); };
+      rail.appendChild(b);
+    }
+  });
+}
+
+document.addEventListener("click", () => {
+  if(showColorPickerDropdown) { showColorPickerDropdown = false; renderToolRail(); }
+  if(showSettingsDropdown) { showSettingsDropdown = false; renderToolRail(); }
+  if(showLayerPopupMenu) { showLayerPopupMenu = false; renderTimeline(); }
+  if(showFpsDropdown) { showFpsDropdown = false; document.getElementById("fpsDropdown").classList.add("hidden"); }
+  if(showOnionDropdown) { showOnionDropdown = false; document.getElementById("onionDropdown").classList.add("hidden"); }
+});
+
+function renderUndoRedo(){
+  document.getElementById("btnUndo").disabled = !past.length;
+  document.getElementById("btnRedo").disabled = !future.length;
+}
+
+function renderPlayButton(){
+  document.getElementById("btnPlay").textContent = S.playing ? "❚❚" : "▶";
+}
+
+function updateFrameCounter(){
+  document.getElementById("frameCur").textContent = String(S.frame+1);
+  document.getElementById("frameTotal").textContent = String(frameCount());
+}
+
+function updateTimelineActive(){
+  const table = document.getElementById("timelineStrip");
+  if(!table) return;
+
+  table.querySelectorAll(".xsheet-colhead").forEach(h => {
+    h.classList.toggle("current", Number(h.dataset.frame)===S.frame);
+  });
+
+  table.querySelectorAll(".xsheet-cell").forEach(c => {
+    const f = Number(c.dataset.frame);
+    const li = Number(c.dataset.layer);
+    c.classList.toggle("current-frame", f===S.frame);
+    c.classList.toggle("active-cell", f===S.frame && li===S.activeLayer);
+  });
+
+  table.querySelectorAll(".xsheet-rowhead").forEach(rh => {
+    rh.classList.toggle("active", Number(rh.dataset.layer)===S.activeLayer);
+  });
+
+  table.querySelectorAll(".audio-track-cell").forEach(c => {
+    c.classList.toggle("current-frame", Number(c.dataset.frame)===S.frame);
+  });
+}
+
+function renderTimeline(){
+  const table = document.getElementById("timelineStrip");
+  table.innerHTML = "";
+  const fc = frameCount();
+
+  const headerRow = el("div", "xsheet-header-row");
+
+  const corner = el("div", "xsheet-corner");
+
+  const addLayerBtn = el("button", "chip compact-btn", "+ Layer");
+  addLayerBtn.style.height = "22px";
+  addLayerBtn.title = "Add Layer";
+  addLayerBtn.onclick = addLayer;
+  corner.appendChild(addLayerBtn);
+
+  const layerSettingsWrap = el("div", "tool-item");
+  const layerSettingsBtn = el("button", "chip compact-btn", "⚙️");
+  layerSettingsBtn.style.height = "22px";
+  layerSettingsBtn.title = "Layer Settings";
+  layerSettingsBtn.onclick = (e) => {
+    e.stopPropagation();
+    showLayerPopupMenu = !showLayerPopupMenu;
+    renderTimeline();
+  };
+  layerSettingsWrap.appendChild(layerSettingsBtn);
+
+  const popupMenu = el("div", `layer-popup-menu${showLayerPopupMenu ? "" : " hidden"}`);
+  popupMenu.onclick = (e) => e.stopPropagation();
+
+  popupMenu.appendChild(el("div", "label", "All Layers List"));
+
+  S.layers.forEach((l, li) => {
+    const itemBox = el("div", "layer-item-box");
+
+    const row1 = el("div", "layer-item-row");
+    const nameInput = el("input");
+    nameInput.type = "text";
+    nameInput.value = l.name;
+    nameInput.style.flex = "1";
+    nameInput.style.padding = "3px 5px";
+    nameInput.style.background = "var(--card)";
+    nameInput.style.color = "var(--foreground)";
+    nameInput.style.border = "1px solid var(--border)";
+    nameInput.style.borderRadius = "4px";
+    nameInput.style.fontSize = "0.7rem";
+    nameInput.oninput = (e) => { l.name = e.target.value; autosave(); };
+    row1.appendChild(nameInput);
+
+    const upBtn = el("button", "chip compact-btn", "↑");
+    upBtn.onclick = () => { moveLayer(li, -1); renderTimeline(); };
+    row1.appendChild(upBtn);
+
+    const downBtn = el("button", "chip compact-btn", "↓");
+    downBtn.onclick = () => { moveLayer(li, 1); renderTimeline(); };
+    row1.appendChild(downBtn);
+
+    const delBtn = el("button", "chip compact-btn chip-danger", "✕");
+    delBtn.onclick = () => { removeLayer(li); renderTimeline(); };
+    row1.appendChild(delBtn);
+
+    itemBox.appendChild(row1);
+
+    const row2 = el("div", "layer-item-row");
+    const opLabel = el("span", "label", `Op: ${Math.round(l.opacity * 100)}%`);
+    opLabel.style.fontSize = "0.55rem";
+    row2.appendChild(opLabel);
+
+    const opRange = el("input");
+    opRange.type = "range";
+    opRange.min = 10;
+    opRange.max = 100;
+    opRange.value = Math.round(l.opacity * 100);
+    opRange.style.flex = "1";
+    opRange.oninput = (e) => { setLayerOpacity(li, Number(e.target.value) / 100); opLabel.textContent = `Op: ${e.target.value}%`; };
+    row2.appendChild(opRange);
+
+    itemBox.appendChild(row2);
+    itemBox.appendChild(attachStepper(opRange));
+
+    const row3 = el("div", "layer-item-row");
+    const flipHBtn = el("button", "chip compact-btn flex-1", "↔ Flip H (Layer)");
+    flipHBtn.title = "এই লেয়ারের সব ফ্রেমের সব ছবি অনুভূমিকভাবে ফ্লিপ হবে";
+    flipHBtn.onclick = () => { flipLayerObjects(li, "x"); };
+    row3.appendChild(flipHBtn);
+
+    const flipVBtn = el("button", "chip compact-btn flex-1", "↕ Flip V (Layer)");
+    flipVBtn.title = "এই লেয়ারের সব ফ্রেমের সব ছবি উলম্বভাবে ফ্লিপ হবে";
+    flipVBtn.onclick = () => { flipLayerObjects(li, "y"); };
+    row3.appendChild(flipVBtn);
+
+    itemBox.appendChild(row3);
+    popupMenu.appendChild(itemBox);
+  });
+
+  layerSettingsWrap.appendChild(popupMenu);
+  corner.appendChild(layerSettingsWrap);
+
+  headerRow.appendChild(corner);
+
+  const colHeads = el("div", "xsheet-colheads");
+  for(let f=0; f<fc; f++){
+    const h = el("div", `xsheet-colhead${f===S.frame ? " current" : ""}`, String(f+1));
+    h.dataset.frame = String(f);
+    h.onclick = () => { S.frame = f; renderAll(); };
+    colHeads.appendChild(h);
+  }
+  headerRow.appendChild(colHeads);
+  table.appendChild(headerRow);
+
+  for(let li=S.layers.length-1; li>=0; li--){
+    const l = S.layers[li];
+    const row = el("div", "xsheet-row");
+
+    const rowhead = el("div", `xsheet-rowhead${li===S.activeLayer ? " active" : ""}`);
+    rowhead.dataset.layer = String(li);
+
+    const visBtn = el("button", "visbtn", l.visible ? "👁" : "🚫");
+    visBtn.onclick = e => { e.stopPropagation(); toggleLayer(li); };
+    rowhead.appendChild(visBtn);
+
+    const nameBtn = el("button", "lname", l.name);
+    nameBtn.onclick = () => { setActiveLayer(li); renderAll(); };
+    rowhead.appendChild(nameBtn);
+    row.appendChild(rowhead);
+
+    const cellsWrap = el("div", "xsheet-cells");
+
+    const layerImageObjects = S.imageObjects.filter(o => o.layerId === l.id);
+    const kfFramesByCell = new Map();
+    layerImageObjects.forEach(o => {
+      o.keyframes.forEach(k => {
+        if(!kfFramesByCell.has(k.frame)) kfFramesByCell.set(k.frame, []);
+        kfFramesByCell.get(k.frame).push(o);
+      });
+    });
+
+    for(let f=0; f<fc; f++){
+      const isCurrentCol = f===S.frame;
+      const isActiveCell = isCurrentCol && li===S.activeLayer;
+      const cls = ["xsheet-cell"];
+
+      if(isCurrentCol) cls.push("current-frame");
+      if(isActiveCell) cls.push("active-cell");
+
+      const cell = el("div", cls.join(" "));
+      cell.dataset.frame = String(f);
+      cell.dataset.layer = String(li);
+
+      const kfObjsHere = kfFramesByCell.get(f);
+      if(kfObjsHere && kfObjsHere.length){
+        const isSelected = kfObjsHere.some(o => o.id===S.selectedObjectId);
+        cell.appendChild(el("span", `xsheet-kf-diamond${isSelected ? " selected" : ""}`));
+      } else {
+        const hasContent = (l.frames[f]||[]).length>0;
+        if(hasContent){ cell.appendChild(el("span", "xsheet-dot")); }
+      }
+
+      cell.onclick = () => {
+        setActiveLayer(li);
+        S.frame = f;
+        const hits = kfFramesByCell.get(f);
+        if(hits && hits.length){
+          if(!hits.some(o=>o.id===S.selectedObjectId)){ S.selectedObjectId = hits[0].id; }
+        }
+        renderAll();
+      };
+      cellsWrap.appendChild(cell);
+    }
+
+    layerImageObjects.forEach(o => {
+      const kfs = sortedKeyframes(o);
+      if(kfs.length<2) return;
+      const firstF = kfs[0].frame;
+      const lastF = kfs[kfs.length-1].frame;
+      const CELL_W = 36;
+      const line = el("div", "xsheet-kf-line");
+      line.style.left = (firstF*CELL_W + CELL_W/2) + "px";
+      line.style.width = ((lastF-firstF)*CELL_W) + "px";
+      cellsWrap.appendChild(line);
+    });
+    row.appendChild(cellsWrap);
+    table.appendChild(row);
+  }
+
+  const audioRow = el("div", "audio-track-row");
+
+  const audioRowhead = el("div", "audio-track-rowhead");
+  audioRowhead.appendChild(el("span", null, "🔊"));
+  audioRowhead.appendChild(el("span", "lname", S.audio ? S.audio.fileName : "কোনো অডিও নেই"));
+  if(S.audio){
+    const removeBtn = el("button", "visbtn", "✕");
+    removeBtn.title = "অডিও সরাও";
+    removeBtn.onclick = e => { e.stopPropagation(); removeAudio(); };
+    audioRowhead.appendChild(removeBtn);
+  }
+  audioRow.appendChild(audioRowhead);
+
+  if(S.audio){
+    const audioCells = el("div", "audio-track-cells");
+    for(let f=0; f<fc; f++){
+      const amp = audioAmplitudeForFrame(f);
+      const hasVoice = amp > AUDIO_VOICE_THRESHOLD;
+      const norm = Math.min(1, amp/0.18);
+      const cell = el("div", `audio-track-cell${f===S.frame ? " current-frame" : ""}`);
+      cell.dataset.frame = String(f);
+      cell.title = hasVoice ? "ভয়েস আছে" : "নিরব";
+      const bar = el("div", `audio-track-bar${hasVoice ? " has-voice" : ""}`);
+      bar.style.height = Math.max(3, Math.round(norm*32)) + "px";
+      cell.appendChild(bar);
+      cell.onclick = () => { S.frame = f; renderAll(); };
+      audioCells.appendChild(cell);
+    }
+    audioRow.appendChild(audioCells);
+  } else {
+    const hint = el("div", "audio-empty-hint", "হেডারে \u201c+ Audio\u201d চেপে ভয়েস/মিউজিক যোগ করো");
+    audioRow.appendChild(hint);
+  }
+
+  table.appendChild(audioRow);
+}
+
+function buildDrawPanelContents(){
+  const container = document.createElement("div");
+
+  let currentSize = S.tool === "eraser" ? S.eraserSize : S.brushSize;
+  let currentOpacity = S.brushOpacity;
+  let labelPrefix = S.tool === "eraser" ? "Eraser" : "Brush";
+
+  const sizeField = el("div", "field");
+  sizeField.appendChild(el("div", "label", `${labelPrefix} size ${currentSize}`));
+
+  const sizeRange = el("input");
+  sizeRange.type = "range";
+  sizeRange.min = 1;
+  sizeRange.max = 120;
+  sizeRange.value = currentSize;
+  sizeRange.oninput = e => {
+    const v = Number(e.target.value);
+    if(S.tool === "eraser") S.eraserSize = v;
+    else S.brushSize = v;
+  };
+  sizeField.appendChild(sizeRange);
+  sizeField.appendChild(attachStepper(sizeRange));
+  container.appendChild(sizeField);
+
+  if(S.tool !== "eraser"){
+    const opField = el("div", "field");
+    opField.appendChild(el("div", "label", `Brush opacity ${Math.round(currentOpacity*100)}%`));
+
+    const opRange = el("input");
+    opRange.type = "range";
+    opRange.min = 10;
+    opRange.max = 100;
+    opRange.value = Math.round(currentOpacity*100);
+    opRange.oninput = e => { S.brushOpacity = Number(e.target.value)/100; };
+    opField.appendChild(opRange);
+    opField.appendChild(attachStepper(opRange));
+    container.appendChild(opField);
+  }
+
+  return container;
+}
+
+function renderAllObjectsPanel(){
+  if(S.imageObjects.length===0) return null;
+
+  const panel = el("div", "panel");
+  panel.appendChild(el("div", "label", `সব ইমেজ OBJECT (${S.imageObjects.length})`));
+
+  const list = document.createElement("div");
+  list.style.cssText = "display:flex;flex-direction:column;gap:.35rem;margin-top:.4rem;";
+
+  S.imageObjects.forEach(o=>{
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:.4rem;";
+
+    const lo = S.layers.find(l=>l.id===o.layerId);
+    const isSel = o.id===S.selectedObjectId;
+    const shapeCount = (o.shapes||[]).length;
+    const label = (lo ? lo.name : "?") + (o.group ? ` [${o.group}]` : "") + (o.parentId ? " 🔗" : "") + ` · ${o.keyframes.length}kf` + (shapeCount ? ` · ${shapeCount+1} shape` : "");
+
+    const btn = el("button", `chip compact-btn${isSel ? " chip-accent" : ""}`, label);
+    btn.style.flex = "1";
+    btn.onclick = () => {
+      S.selectedObjectId = o.id;
+      const li = S.layers.findIndex(l=>l.id===o.layerId);
+      if(li>=0) S.activeLayer = li;
+      renderAll();
+    };
+    row.appendChild(btn);
+
+    const delBtn = el("button", "chip compact-btn chip-danger", "✕");
+    delBtn.onclick = () => {
+      commit((ls,objs) => ({ imageObjects: clearDanglingParents(objs.filter(x=>x.id!==o.id)) }));
+      if(S.selectedObjectId===o.id) S.selectedObjectId = null;
+      renderAll();
+    };
+    row.appendChild(delBtn);
+
+    list.appendChild(row);
+  });
+
+  panel.appendChild(list);
+  return panel;
+}
+
+function toggleObjectFlip(axis){
+  const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+  if(!obj) return;
+  const preState = { layers: S.layers, imageObjects: cloneImageObjects(S.imageObjects) };
+  const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+  if(axis==="x") kf.flipX = !kf.flipX;
+  else kf.flipY = !kf.flipY;
+  past.push(preState);
+  if(past.length>40) past.shift();
+  future = [];
+  autosave();
+  renderUndoRedo();
+  renderAll();
+}
+
+function flipLayerObjects(layerIndex, axis){
+  const layer = S.layers[layerIndex];
+  if(!layer) return;
+  commit((ls, objs) => ({
+    imageObjects: objs.map(o => {
+      if(o.layerId !== layer.id) return o;
+      return {
+        ...o,
+        keyframes: o.keyframes.map(k => axis==="x" ? { ...k, flipX: !k.flipX } : { ...k, flipY: !k.flipY })
+      };
+    })
+  }));
+  renderAll();
+}
+
+function setObjectParent(obj, parentId){
+  if(parentId === obj.id) return;
+  if(parentId){
+    let cur = findObjectById(parentId);
+    const guard = new Set();
+    while(cur){
+      if(cur.id===obj.id) return;
+      if(guard.has(cur.id)) break;
+      guard.add(cur.id);
+      cur = cur.parentId ? findObjectById(cur.parentId) : null;
+    }
+  }
+  commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
+    ...o, parentId: parentId || null, parentBindFrame: parentId ? S.frame : null
+  }) }));
+  renderAll();
+}
+
+function rebindObjectToParent(obj){
+  if(!obj.parentId) return;
+  commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : { ...o, parentBindFrame: S.frame }) }));
+  renderAll();
+}
+
+function setObjectGroup(obj, group){
+  S.imageObjects = S.imageObjects.map(o => o.id!==obj.id ? o : { ...o, group });
+  autosave();
+}
+
+function addKeyframeToSelectedObject(){
+  const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+  if(!obj) return;
+
+  const t = objectTransformAt(obj, S.frame);
+  commit((ls,objs) => ({ imageObjects: objs.map(o=>{
+    if(o.id!==obj.id) return o;
+    const exists = o.keyframes.some(k=>k.frame===S.frame);
+    const nk = exists
+      ? o.keyframes.map(k => k.frame===S.frame ? { ...k, x:t.x,y:t.y,w:t.w,h:t.h,rotation:t.rotation,opacity:t.opacity,flipX:!!t.flipX,flipY:!!t.flipY } : k)
+      : [...o.keyframes, { frame:S.frame, x:t.x,y:t.y,w:t.w,h:t.h,rotation:t.rotation,opacity:t.opacity,flipX:!!t.flipX,flipY:!!t.flipY, easing:"linear" }];
+    return { ...o, keyframes: nk };
+  }) }));
+  renderAll();
+}
+
+function renderTopKeyframeButton(){
+  const btn = document.getElementById("btnAddKeyframeTop");
+  const isSelectTool = S.tool === "select";
+  btn.classList.toggle("hidden", !isSelectTool);
+  if(isSelectTool){
+    const hasSelection = S.imageObjects.some(o=>o.id===S.selectedObjectId);
+    btn.disabled = !hasSelection;
+  }
+}
+
+function buildShapeThumb(shape, isActive, obj){
+  const thumb = el("button", `chip compact-btn${isActive ? " chip-accent" : ""}`);
+  thumb.style.cssText = "flex-direction:column;padding:4px;gap:2px;width:56px;height:56px;";
+  const img = document.createElement("img");
+  img.src = shape.src;
+  img.style.cssText = "width:100%;height:38px;object-fit:contain;background:rgba(255,255,255,.85);border-radius:4px;";
+  thumb.appendChild(img);
+  const tag = el("span", null, shape.id==="base" ? "মূল" : "শেপ");
+  tag.style.fontSize = "0.5rem";
+  thumb.appendChild(tag);
+  thumb.title = "এই ফ্রেমে এই ঠোঁটের শেপ বসাও";
+  thumb.onclick = () => assignShapeToCurrentFrame(obj, shape.id);
+  return thumb;
+}
+
+function renderObjectPanel(){
+  const root = document.getElementById("panelContent");
+  root.innerHTML = "";
+  if(S.tool !== "select") return;
+
+  const panel = el("div", "panel");
+  const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+
+  if(!obj){
+    panel.appendChild(el("div", "label", "IMAGE OBJECT"));
+    const hint = document.createElement("div");
+    hint.style.cssText = "font-size:.72rem;color:var(--muted-foreground);margin-top:.4rem;";
+    hint.textContent = "ক্যানভাসে একটা ইমেজ object ট্যাপ করে সিলেক্ট করো, অথবা Import Gallery দিয়ে নতুন ইমেজ যোগ করো।";
+    panel.appendChild(hint);
+    root.appendChild(panel);
+    const allPanel = renderAllObjectsPanel();
+    if(allPanel) root.appendChild(allPanel);
+    return;
+  }
+
+  const header = document.createElement("div");
+  header.style.cssText = "display:flex;align-items:center;gap:.4rem;";
+  header.appendChild(el("div", "label", "IMAGE OBJECT · " + (function(){
+    const lo = S.layers.find(l=>l.id===obj.layerId);
+    return lo ? lo.name : "";
+  })()));
+  const delObjBtn = el("button", "chip chip-danger compact-btn ml-auto", "Delete Object");
+  delObjBtn.onclick = () => {
+    commit((ls,objs) => ({ imageObjects: clearDanglingParents(objs.filter(o=>o.id!==obj.id)) }));
+    S.selectedObjectId = null;
+    renderAll();
+  };
+  header.appendChild(delObjBtn);
+  panel.appendChild(header);
+
+  const parentField = el("div", "field");
+  parentField.appendChild(el("div", "label", "PARENT (কোন object-এর সাথে লিংক)"));
+  const parentRow = el("div", "layer-item-row");
+  parentRow.style.marginTop = ".35rem";
+
+  const parentSel = document.createElement("select");
+  parentSel.style.cssText = "flex:1;font-size:.68rem;background:var(--secondary);color:var(--foreground);border:1px solid var(--border);border-radius:6px;padding:.3rem;";
+  const noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "কোনো Parent নেই";
+  if(!obj.parentId) noneOpt.selected = true;
+  parentSel.appendChild(noneOpt);
+  S.imageObjects.filter(o=>o.id!==obj.id).forEach(o=>{
+    const lo = S.layers.find(l=>l.id===o.layerId);
+    const opt = document.createElement("option");
+    opt.value = o.id;
+    opt.textContent = (lo ? lo.name : "?") + (o.group ? ` [${o.group}]` : "") + ` #${o.id.slice(0,4)}`;
+    if(obj.parentId===o.id) opt.selected = true;
+    parentSel.appendChild(opt);
+  });
+  parentSel.onchange = (e) => { setObjectParent(obj, e.target.value || null); };
+  parentRow.appendChild(parentSel);
+  parentField.appendChild(parentRow);
+
+  if(obj.parentId){
+    const rebindRow = el("div", "layer-item-row");
+    rebindRow.style.marginTop = ".3rem";
+    const rebindBtn = el("button", "chip compact-btn flex-1", "এই ফ্রেমে আবার Bind করো");
+    rebindBtn.title = "এখন থেকে এই ফ্রেমের pose-কেই parent-এর 'বেস' পোজ ধরা হবে";
+    rebindBtn.onclick = () => rebindObjectToParent(obj);
+    rebindRow.appendChild(rebindBtn);
+    parentField.appendChild(rebindRow);
+  }
+  panel.appendChild(parentField);
+
+  const groupField = el("div", "field");
+  groupField.appendChild(el("div", "label", "GROUP (যেমন: mouth, eye)"));
+  const groupInput = document.createElement("input");
+  groupInput.type = "text";
+  groupInput.value = obj.group || "";
+  groupInput.placeholder = "যেমন: mouth";
+  groupInput.style.cssText = "width:100%;margin-top:.35rem;padding:.35rem .4rem;background:var(--secondary);color:var(--foreground);border:1px solid var(--border);border-radius:6px;font-size:.68rem;";
+  groupInput.oninput = (e) => setObjectGroup(obj, e.target.value);
+  groupField.appendChild(groupInput);
+  panel.appendChild(groupField);
+
+  const shapeField = el("div", "field");
+  shapeField.appendChild(el("div", "label", "শেপ লাইব্রেরি (একাধিক ঠোঁট/এক্সপ্রেশন)"));
+
+  const shapeHint = document.createElement("div");
+  shapeHint.style.cssText = "font-size:.65rem;color:var(--muted-foreground);margin-top:.3rem;";
+  shapeHint.textContent = "একাধিক শেপ আপলোড করো, তারপর যে ফ্রেমে যে শেপ দরকার সেটাতে ট্যাপ করলেই এই object-এর জায়গায় সেটা বসে যাবে।";
+  shapeField.appendChild(shapeHint);
+
+  const shapeGrid = document.createElement("div");
+  shapeGrid.style.cssText = "display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem;";
+
+  const activeShape = resolveActiveShape(obj, S.frame);
+  shapeGrid.appendChild(buildShapeThumb({ id:"base", src:obj.src }, activeShape.id==="base", obj));
+
+  (obj.shapes||[]).forEach(s => {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:relative;";
+    wrap.appendChild(buildShapeThumb(s, activeShape.id===s.id, obj));
+    const rm = el("button", "chip compact-btn chip-danger", "✕");
+    rm.style.cssText = "position:absolute;top:-6px;right:-6px;width:1.1rem;height:1.1rem;padding:0;border-radius:999px;font-size:.55rem;";
+    rm.title = "লাইব্রেরি থেকে এই শেপ মুছে ফেলো";
+    rm.onclick = (e) => { e.stopPropagation(); removeShapeFromLibrary(obj, s.id); };
+    wrap.appendChild(rm);
+    shapeGrid.appendChild(wrap);
+  });
+
+  const addShapeBtn = el("button", "chip compact-btn", "+ শেপ যোগ করো");
+  addShapeBtn.style.cssText = "width:56px;height:56px;";
+  addShapeBtn.onclick = () => {
+    pendingShapeTargetObjId = obj.id;
+    document.getElementById("shapeInput").click();
+  };
+  shapeGrid.appendChild(addShapeBtn);
+
+  shapeField.appendChild(shapeGrid);
+
+  if((obj.shapeKeyframes||[]).length){
+    const curSk = (obj.shapeKeyframes||[]).find(k=>k.frame===S.frame);
+    if(curSk){
+      const clearRow = el("div", "layer-item-row");
+      clearRow.style.marginTop = ".35rem";
+      const clearBtn = el("button", "chip compact-btn flex-1", "এই ফ্রেমের শেপ-বদল মুছো");
+      clearBtn.onclick = () => {
+        commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
+          ...o, shapeKeyframes: (o.shapeKeyframes||[]).filter(k=>k.frame!==S.frame)
+        }) }));
+        renderAll();
+      };
+      clearRow.appendChild(clearBtn);
+      shapeField.appendChild(clearRow);
+    }
+  }
+
+  panel.appendChild(shapeField);
+
+  const curT = objectTransformAt(obj, S.frame);
+
+  const flipField = el("div", "field");
+  flipField.appendChild(el("div", "label", "FLIP (এই ফ্রেমে)"));
+  const flipRow = el("div", "layer-item-row");
+  flipRow.style.marginTop = ".35rem";
+
+  const flipHBtn = el("button", `chip compact-btn flex-1${curT.flipX ? " chip-accent" : ""}`, "↔ Flip H");
+  flipHBtn.onclick = () => toggleObjectFlip("x");
+  flipRow.appendChild(flipHBtn);
+
+  const flipVBtn = el("button", `chip compact-btn flex-1${curT.flipY ? " chip-accent" : ""}`, "↕ Flip V");
+  flipVBtn.onclick = () => toggleObjectFlip("y");
+  flipRow.appendChild(flipVBtn);
+
+  flipField.appendChild(flipRow);
+  panel.appendChild(flipField);
+
+  const kfField = el("div", "field");
+  const kfs = sortedKeyframes(obj);
+  const kfAtPlayhead = obj.keyframes.find(k=>k.frame===S.frame);
+
+  if(kfAtPlayhead){
+    const kfHeader = document.createElement("div");
+    kfHeader.style.cssText = "display:flex;align-items:center;gap:.4rem;";
+    kfHeader.appendChild(el("div", "label", `KEYFRAME #${S.frame+1}`));
+
+    const easingSel = document.createElement("select");
+    easingSel.style.cssText = "margin-left:auto;font-size:.62rem;background:var(--secondary);color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:2px 4px;";
+    Object.keys(EASINGS).forEach(k=>{
+      const o = document.createElement("option");
+      o.value = k;
+      o.textContent = EASING_LABELS[k];
+      if(kfAtPlayhead.easing===k) o.selected = true;
+      easingSel.appendChild(o);
+    });
+    easingSel.onchange = (e) => {
+      const val = e.target.value;
+      commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
+        ...o, keyframes: o.keyframes.map(k => k.frame===S.frame ? { ...k, easing: val } : k)
+      }) }));
+      renderAll();
+    };
+    kfHeader.appendChild(easingSel);
+
+    if(kfs.length>1){
+      const delKfBtn = el("button", "chip compact-btn chip-danger", "Delete KF");
+      delKfBtn.onclick = () => {
+        commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
+          ...o, keyframes: o.keyframes.filter(k => k.frame!==S.frame)
+        }) }));
+        renderAll();
+      };
+      kfHeader.appendChild(delKfBtn);
+    }
+    kfField.appendChild(kfHeader);
+  } else {
+    const hint = document.createElement("div");
+    hint.style.cssText = "font-size:.68rem;color:var(--muted-foreground);";
+    hint.textContent = kfs.length>1
+      ? "এই ফ্রেমে keyframe নেই — পাশের keyframe দুটোর মাঝে ইন্টারপোলেটেড মান দেখানো হচ্ছে।"
+      : "এখনো একটাই keyframe — এখানে move/scale/rotate করলে অ্যানিমেশনের বদলে পুরো object-ই বদলাবে।";
+    kfField.appendChild(el("div", "label", "KEYFRAME"));
+    hint.style.marginTop = ".3rem";
+    kfField.appendChild(hint);
+  }
+  panel.appendChild(kfField);
+
+  const opField = el("div", "field");
+  const opLabel = el("div", "label", `OPACITY ${Math.round(curT.opacity*100)}%`);
+  opField.appendChild(opLabel);
+  const opRange = document.createElement("input");
+  opRange.type = "range"; opRange.min = 0; opRange.max = 100;
+  opRange.value = Math.round(curT.opacity*100);
+  opRange.oninput = (e) => {
+    const v = Number(e.target.value)/100;
+    const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+    kf.opacity = v;
+    opLabel.textContent = `OPACITY ${e.target.value}%`;
+    autosave();
+    paint();
+  };
+  opField.appendChild(opRange);
+  opField.appendChild(attachStepper(opRange));
+  panel.appendChild(opField);
+
+  const rotField = el("div", "field");
+  const rotLabel = el("div", "label", `ROTATION ${Math.round(curT.rotation*180/Math.PI)}°`);
+  rotField.appendChild(rotLabel);
+  const rotRange = document.createElement("input");
+  rotRange.type = "range"; rotRange.min = -180; rotRange.max = 180;
+  rotRange.value = Math.round(curT.rotation*180/Math.PI);
+  rotRange.oninput = (e) => {
+    const v = Number(e.target.value)*Math.PI/180;
+    const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+    kf.rotation = v;
+    rotLabel.textContent = `ROTATION ${e.target.value}°`;
+    autosave();
+    paint();
+  };
+  rotField.appendChild(rotRange);
+  rotField.appendChild(attachStepper(rotRange));
+  panel.appendChild(rotField);
+
+  const sizeField = el("div", "field");
+  const curSizePct = Math.round(curT.w*100);
+  const sizeLabel = el("div", "label", `SIZE (জুম) ${curSizePct}%`);
+  sizeField.appendChild(sizeLabel);
+  const sizeRange = document.createElement("input");
+  sizeRange.type = "range"; sizeRange.min = 2; sizeRange.max = 400;
+  sizeRange.value = curSizePct;
+  sizeRange.oninput = (e) => {
+    const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+    const newW = Math.max(0.02, Number(e.target.value)/100);
+    const ratio = newW/kf.w;
+    const newH = Math.max(0.02, kf.h*ratio);
+    const cx = kf.x + kf.w/2;
+    const cy = kf.y + kf.h/2;
+    kf.w = newW;
+    kf.h = newH;
+    kf.x = cx - newW/2;
+    kf.y = cy - newH/2;
+    sizeLabel.textContent = `SIZE (জুম) ${e.target.value}%`;
+    autosave();
+    paint();
+  };
+  sizeField.appendChild(sizeRange);
+  sizeField.appendChild(attachStepper(sizeRange));
+  panel.appendChild(sizeField);
+
+  const posXField = el("div", "field");
+  const curPosXPct = Math.round((curT.x+curT.w/2)*100);
+  const posXLabel = el("div", "label", `POSITION X (বামে ↔ ডানে) ${curPosXPct}%`);
+  posXField.appendChild(posXLabel);
+  const posXRange = document.createElement("input");
+  posXRange.type = "range"; posXRange.min = 0; posXRange.max = 100;
+  posXRange.value = curPosXPct;
+  posXRange.oninput = (e) => {
+    const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+    const newCx = Number(e.target.value)/100;
+    kf.x = newCx - kf.w/2;
+    posXLabel.textContent = `POSITION X (বামে ↔ ডানে) ${e.target.value}%`;
+    autosave();
+    paint();
+  };
+  posXField.appendChild(posXRange);
+  posXField.appendChild(attachStepper(posXRange));
+  panel.appendChild(posXField);
+
+  const posYField = el("div", "field");
+  const curPosYPct = Math.round((curT.y+curT.h/2)*100);
+  const posYLabel = el("div", "label", `POSITION Y (উপরে ↕ নিচে) ${curPosYPct}%`);
+  posYField.appendChild(posYLabel);
+  const posYRange = document.createElement("input");
+  posYRange.type = "range"; posYRange.min = 0; posYRange.max = 100;
+  posYRange.value = curPosYPct;
+  posYRange.oninput = (e) => {
+    const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+    const newCy = Number(e.target.value)/100;
+    kf.y = newCy - kf.h/2;
+    posYLabel.textContent = `POSITION Y (উপরে ↕ নিচে) ${e.target.value}%`;
+    autosave();
+    paint();
+  };
+  posYField.appendChild(posYRange);
+  posYField.appendChild(attachStepper(posYRange));
+  panel.appendChild(posYField);
+
+  root.appendChild(panel);
+  const allPanel = renderAllObjectsPanel();
+  if(allPanel) root.appendChild(allPanel);
+}
+
+function renderAll(){
+  renderToolRail();
+  renderUndoRedo();
+  renderPlayButton();
+  updateFrameCounter();
+
+  document.getElementById("btnOnion").className = `chip${S.onion ? " chip-on" : ""}`;
+  document.getElementById("btnLoop").className = `chip${S.loop ? " chip-on" : ""}`;
+  document.getElementById("btnFpsToggle").textContent = `FPS: ${S.fps}`;
+  document.getElementById("fpsLabel").textContent = `Rate: ${S.fps} fps`;
+  document.getElementById("fpsRange").value = S.fps;
+  const fpsNumInput = document.querySelector("#fpsStepperRow .stepper-input");
+  if(fpsNumInput) fpsNumInput.value = S.fps;
+
+  const onionToggleBtn = document.getElementById("btnOnionToggle");
+  if(onionToggleBtn){
+    onionToggleBtn.textContent = `Onion: ${S.onion ? "ON" : "OFF"}`;
+    onionToggleBtn.className = `chip w-full${S.onion ? " chip-accent" : ""}`;
+  }
+  const onionBeforeLabel = document.getElementById("onionBeforeLabel");
+  if(onionBeforeLabel) onionBeforeLabel.textContent = String(S.onionBefore);
+  const onionAfterLabel = document.getElementById("onionAfterLabel");
+  if(onionAfterLabel) onionAfterLabel.textContent = String(S.onionAfter);
+  const onionBeforeNumInput = document.querySelector("#onionBeforeStepperRow .stepper-input");
+  if(onionBeforeNumInput) onionBeforeNumInput.value = S.onionBefore;
+  const onionAfterNumInput = document.querySelector("#onionAfterStepperRow .stepper-input");
+  if(onionAfterNumInput) onionAfterNumInput.value = S.onionAfter;
+
+  renderTopKeyframeButton();
+  renderTimeline();
+  renderObjectPanel();
+  syncAudioToFrame();
+  paint();
+}
+
+document.getElementById("btnUndo").onclick = undo;
+document.getElementById("btnRedo").onclick = redo;
+document.getElementById("btnFirst").onclick = () => { S.frame = 0; renderAll(); };
+document.getElementById("btnPrev").onclick = () => { S.frame = Math.max(0, S.frame-1); renderAll(); };
+document.getElementById("btnNext").onclick = () => { S.frame = Math.min(frameCount()-1, S.frame+1); renderAll(); };
+
+document.getElementById("btnPlay").onclick = () => {
+  S.playing = !S.playing;
+  const audioEl = document.getElementById("audioEl");
+  if(S.playing){
+    startPlayback();
+    if(S.audio){
+      try{ audioEl.currentTime = S.frame/S.fps; }catch(e){}
+      audioEl.play().catch(()=>{});
+    }
+  } else {
+    stopPlayback();
+    if(S.audio) audioEl.pause();
+  }
+  renderAll();
+};
+
+document.getElementById("btnFpsToggle").onclick = (e) => {
+  e.stopPropagation();
+  showFpsDropdown = !showFpsDropdown;
+  document.getElementById("fpsDropdown").classList.toggle("hidden", !showFpsDropdown);
+};
+
+document.getElementById("fpsDropdown").onclick = (e) => e.stopPropagation();
+
+document.getElementById("fpsRange").oninput = (e) => {
+  S.fps = Number(e.target.value);
+  document.getElementById("btnFpsToggle").textContent = `FPS: ${S.fps}`;
+  document.getElementById("fpsLabel").textContent = `Rate: ${S.fps} fps`;
+  autosave();
+};
+
+document.getElementById("fpsStepperRow").appendChild(attachStepper(document.getElementById("fpsRange")));
+
+document.getElementById("btnOnion").onclick = (e) => {
+  e.stopPropagation();
+  showOnionDropdown = !showOnionDropdown;
+  document.getElementById("onionDropdown").classList.toggle("hidden", !showOnionDropdown);
+};
+document.getElementById("onionDropdown").onclick = (e) => e.stopPropagation();
+
+document.getElementById("btnOnionToggle").onclick = () => {
+  S.onion = !S.onion;
+  const btn = document.getElementById("btnOnionToggle");
+  btn.textContent = `Onion: ${S.onion ? "ON" : "OFF"}`;
+  btn.className = `chip w-full${S.onion ? " chip-accent" : ""}`;
+  document.getElementById("btnOnion").className = `chip${S.onion ? " chip-on" : ""}`;
+  autosave();
+  paint();
+};
+
+const onionBeforeRange = document.createElement("input");
+onionBeforeRange.type = "range";
+onionBeforeRange.min = 0;
+onionBeforeRange.max = 8;
+onionBeforeRange.value = S.onionBefore;
+onionBeforeRange.oninput = (e) => {
+  S.onionBefore = Number(e.target.value);
+  const lbl = document.getElementById("onionBeforeLabel");
+  if(lbl) lbl.textContent = e.target.value;
+  autosave();
+  paint();
+};
+document.getElementById("onionBeforeStepperRow").appendChild(attachStepper(onionBeforeRange));
+
+const onionAfterRange = document.createElement("input");
+onionAfterRange.type = "range";
+onionAfterRange.min = 0;
+onionAfterRange.max = 8;
+onionAfterRange.value = S.onionAfter;
+onionAfterRange.oninput = (e) => {
+  S.onionAfter = Number(e.target.value);
+  const lbl = document.getElementById("onionAfterLabel");
+  if(lbl) lbl.textContent = e.target.value;
+  autosave();
+  paint();
+};
+document.getElementById("onionAfterStepperRow").appendChild(attachStepper(onionAfterRange));
+
+document.getElementById("btnLoop").onclick = () => { S.loop = !S.loop; renderAll(); };
+document.getElementById("btnAddKeyframeTop").onclick = addKeyframeToSelectedObject;
+document.getElementById("btnAddFrame").onclick = addFrame;
+document.getElementById("btnDupFrame").onclick = duplicateFrame;
+document.getElementById("btnCopy").onclick = copyCurrentFrame;
+document.getElementById("btnPaste").onclick = pasteToCurrentFrame;
+document.getElementById("btnClear").onclick = clearFrame;
+document.getElementById("btnDelFrame").onclick = deleteFrame;
+
+const exportDropdown = document.getElementById("exportDropdown");
+document.getElementById("btnExportTab").onclick = (e) => {
+  e.stopPropagation();
+  exportDropdown.classList.toggle("hidden");
+};
+
+document.addEventListener("click", () => { exportDropdown.classList.add("hidden"); });
+
+document.getElementById("b4k").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(2); };
+document.getElementById("b1080").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(1); };
+document.getElementById("bpng").onclick = () => { exportDropdown.classList.add("hidden"); exportPng(); };
+
+document.getElementById("btnImportGallery").onclick = () => { document.getElementById("photoInput").click(); };
+
+document.getElementById("photoInput").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  importPhoto(file).catch(err => {
+    console.error("ছবি ইমপোর্ট ব্যর্থ:", err);
+    alert("ছবি যোগ করতে সমস্যা হয়েছে: " + (err && err.message ? err.message : String(err)));
+  });
+  e.target.value = "";
+});
+
+document.getElementById("btnImportAudio").onclick = () => { document.getElementById("audioInput").click(); };
+
+document.getElementById("audioInput").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  importAudioFile(file).catch(err => {
+    console.error("অডিও ইমপোর্ট ব্যর্থ:", err);
+    alert("অডিও যোগ করতে সমস্যা হয়েছে: " + (err && err.message ? err.message : String(err)));
+  });
+  e.target.value = "";
+});
+
+document.getElementById("shapeInput").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  const targetId = pendingShapeTargetObjId;
+  pendingShapeTargetObjId = null;
+  const obj = targetId ? S.imageObjects.find(o=>o.id===targetId) : null;
+  if(file && obj){
+    addShapeToLibrary(obj, file).catch(err => {
+      console.error("শেপ যোগ করা ব্যর্থ:", err);
+      alert("শেপ যোগ করতে সমস্যা হয়েছে: " + (err && err.message ? err.message : String(err)));
+    });
+  }
+  e.target.value = "";
+});
+
+tryRestore();
+renderAll();
+requestAnimationFrame(resizeCanvas);
+window.addEventListener("resize", resizeCanvas);
+
+})();
+</script>
+
+</body>
+</html>
