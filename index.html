@@ -155,8 +155,8 @@ input[type=range]{width:100%;accent-color:var(--accent);}
   <button id="btnExportTab" class="chip chip-accent compact-btn">Export</button>
 
   <div id="exportDropdown" class="export-dropdown hidden">
-    <button id="b4k" class="chip w-full chip-accent" style="margin-bottom:.35rem;">Export YouTube 4K</button>
-    <button id="b1080" class="chip w-full" style="margin-bottom:.35rem;">Export YouTube 1080p</button>
+    <button id="b4k" class="chip w-full chip-accent" style="margin-bottom:.35rem;">Export MP4 — YouTube 4K</button>
+    <button id="b1080" class="chip w-full" style="margin-bottom:.35rem;">Export MP4 — YouTube 1080p</button>
     <button id="bpng" class="chip w-full">Export PNG Frame</button>
   </div>
 </header>
@@ -1614,8 +1614,160 @@ function exportPng(){
   a.click();
 }
 
-async function exportVideo(scale){
-  if(exportState.active) return;
+function downloadBlob(blob, name){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+function mp4FileName(scale){
+  return scale===1 ? "youtube-animation-1080p.mp4" : "youtube-animation-4k.mp4";
+}
+
+async function pickAvcCodec(w, h, fps, bitrate){
+  const candidates = ["avc1.640034","avc1.640033","avc1.64002A","avc1.4D0033","avc1.42E03E"];
+  for(const codec of candidates){
+    try{
+      const support = await VideoEncoder.isConfigSupported({
+        codec, width:w, height:h, framerate:fps, bitrate,
+        avc:{ format:"avc" }
+      });
+      if(support && support.supported) return codec;
+    }catch(e){}
+  }
+  return null;
+}
+
+// True MP4 (H.264 + AAC) export via WebCodecs + mp4-muxer, frame by frame.
+async function exportVideoMp4WebCodecs(scale){
+  if(typeof VideoEncoder === "undefined") return false;
+
+  const w = STAGE_W*scale;
+  const h = STAGE_H*scale;
+  const fps = S.fps;
+  const bitrate = scale===1 ? 12000000 : 40000000;
+
+  const codec = await pickAvcCodec(w, h, fps, bitrate);
+  if(!codec) return false;
+
+  let Muxer, ArrayBufferTarget;
+  try{
+    const mod = await import("https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/+esm");
+    Muxer = mod.Muxer;
+    ArrayBufferTarget = mod.ArrayBufferTarget;
+  }catch(e){ return false; }
+  if(!Muxer) return false;
+
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  const ctx = off.getContext("2d");
+  if(!ctx) return false;
+
+  const samples = (S.audio && S.audio.samples && S.audio.samples.length) ? S.audio.samples : null;
+  const sampleRate = samples ? (S.audio.sampleRate || 48000) : 48000;
+
+  let audioOk = false;
+  if(samples && typeof AudioEncoder !== "undefined"){
+    try{
+      const support = await AudioEncoder.isConfigSupported({
+        codec:"mp4a.40.2", sampleRate, numberOfChannels:1, bitrate:128000
+      });
+      audioOk = !!(support && support.supported);
+    }catch(e){ audioOk = false; }
+  }
+
+  const target = new ArrayBufferTarget();
+  const muxer = new Muxer({
+    target,
+    fastStart: "in-memory",
+    video: { codec:"avc", width:w, height:h, frameRate:fps },
+    ...(audioOk ? { audio:{ codec:"aac", numberOfChannels:1, sampleRate } } : {})
+  });
+
+  const videoEncoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => console.error(e)
+  });
+  videoEncoder.configure({ codec, width:w, height:h, framerate:fps, bitrate, avc:{ format:"avc" } });
+
+  let audioEncoder = null;
+  if(audioOk){
+    audioEncoder = new AudioEncoder({
+      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+      error: (e) => console.error(e)
+    });
+    audioEncoder.configure({ codec:"mp4a.40.2", sampleRate, numberOfChannels:1, bitrate:128000 });
+  }
+
+  exportState.active = true;
+  showExportOverlay(audioOk ? "MP4 রেন্ডার হচ্ছে (অডিও সহ)…" : "MP4 রেন্ডার হচ্ছে…");
+
+  S.playing = false;
+  stopPlayback();
+  renderPlayButton();
+  const previewAudioEl = document.getElementById("audioEl");
+  if(previewAudioEl) previewAudioEl.pause();
+
+  try{
+    const total = frameCount();
+    for(let i=0; i<total; i++){
+      renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
+      const frame = new VideoFrame(off, {
+        timestamp: Math.round(i*1e6/fps),
+        duration: Math.round(1e6/fps)
+      });
+      videoEncoder.encode(frame, { keyFrame: i % fps === 0 });
+      frame.close();
+      showExportOverlay(`MP4 রেন্ডার হচ্ছে ${i+1}/${total}`);
+      if(videoEncoder.encodeQueueSize > 8) await new Promise(r => setTimeout(r, 0));
+      else if(i % 3 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+
+    if(audioEncoder){
+      const videoDurSec = total/fps;
+      const maxSamples = Math.min(samples.length, Math.ceil(videoDurSec*sampleRate));
+      const CHUNK = 1024;
+      for(let off2=0; off2<maxSamples; off2+=CHUNK){
+        const len = Math.min(CHUNK, maxSamples-off2);
+        const data = new Float32Array(len);
+        data.set(samples.subarray(off2, off2+len));
+        const audioData = new AudioData({
+          format:"f32-planar",
+          sampleRate,
+          numberOfFrames:len,
+          numberOfChannels:1,
+          timestamp: Math.round(off2*1e6/sampleRate),
+          data
+        });
+        audioEncoder.encode(audioData);
+        audioData.close();
+        if(audioEncoder.encodeQueueSize > 16) await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    showExportOverlay("MP4 ফাইল তৈরি হচ্ছে…");
+    await videoEncoder.flush();
+    if(audioEncoder) await audioEncoder.flush();
+    muxer.finalize();
+
+    downloadBlob(new Blob([target.buffer], { type:"video/mp4" }), mp4FileName(scale));
+    return true;
+  }catch(err){
+    console.error(err);
+    return false;
+  }finally{
+    try{ videoEncoder.close(); }catch(e){}
+    if(audioEncoder){ try{ audioEncoder.close(); }catch(e){} }
+    exportState.active = false;
+    hideExportOverlay();
+  }
+}
+
+// Fallback: realtime MP4 capture through MediaRecorder when WebCodecs is unavailable.
+async function exportVideoRecorder(scale){
   const w = STAGE_W*scale;
   const h = STAGE_H*scale;
   const off = document.createElement("canvas");
@@ -1624,7 +1776,7 @@ async function exportVideo(scale){
   const ctx = off.getContext("2d");
   if(!ctx) return;
 
-  if(!off.captureStream){ alert("এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট করে না।"); return; }
+  if(!off.captureStream || !window.MediaRecorder){ alert("এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট করে না।"); return; }
 
   const videoStream = off.captureStream(S.fps);
 
@@ -1654,17 +1806,17 @@ async function exportVideo(scale){
 
   const hasAudioTrack = combinedStream.getAudioTracks().length>0;
   const mimeCandidates = hasAudioTrack ? [
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp8,opus",
-    "video/webm"
+    "video/mp4;codecs=avc1.640033,mp4a.40.2",
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4"
   ] : [
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm"
+    "video/mp4;codecs=avc1.640033",
+    "video/mp4;codecs=avc1.42E01E",
+    "video/mp4"
   ];
-  const mime = mimeCandidates.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
+  const mime = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m));
 
-  if(!mime){ alert("এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট করে না।"); return; }
+  if(!mime){ alert("এই ব্রাউজারে MP4 এক্সপোর্ট সাপোর্ট করে না। Chrome বা Edge ব্যবহার করুন।"); return; }
 
   const rec = new MediaRecorder(combinedStream, {
     mimeType: mime, videoBitsPerSecond: scale===1 ? 20000000 : 8000000
@@ -1676,7 +1828,7 @@ async function exportVideo(scale){
 
   rec.start();
   exportState.active = true;
-  showExportOverlay(hasAudioTrack ? "রেন্ডার হচ্ছে (অডিও সহ)…" : "রেন্ডার হচ্ছে…");
+  showExportOverlay("MP4 রেন্ডার হচ্ছে…");
 
   S.playing = false;
   stopPlayback();
@@ -1690,7 +1842,7 @@ async function exportVideo(scale){
 
   for(let i=0; i<frameCount(); i++){
     renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
-    showExportOverlay(`রেন্ডার হচ্ছে ${i+1}/${frameCount()}`);
+    showExportOverlay(`MP4 রেন্ডার হচ্ছে ${i+1}/${frameCount()}`);
     await new Promise(r => setTimeout(r, Math.max(1000/S.fps, 40)));
   }
 
@@ -1706,14 +1858,79 @@ async function exportVideo(scale){
   }
 
   const blob = new Blob(chunks, { type: mime });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = scale===1 ? "youtube-animation-4k.webm" : "youtube-animation-1080p.webm";
-  a.click();
+  downloadBlob(blob, mp4FileName(scale));
 
   exportState.active = false;
   hideExportOverlay();
 }
+
+// Universal fallback: pure-WASM H.264 MP4 encoder (video only, works in any browser).
+function loadScriptOnce(src){
+  return new Promise((res, rej) => {
+    if(document.querySelector(`script[data-src="${src}"]`)) return res();
+    const s = document.createElement("script");
+    s.src = src; s.dataset.src = src;
+    s.onload = () => res();
+    s.onerror = () => rej(new Error("load failed"));
+    document.head.appendChild(s);
+  });
+}
+
+async function exportVideoMp4Wasm(scale){
+  try{
+    await loadScriptOnce("https://cdn.jsdelivr.net/npm/h264-mp4-encoder@1.0.12/embuild/dist/h264-mp4-encoder.web.js");
+  }catch(e){ return false; }
+  const HME = window.HME;
+  if(!HME || !HME.createH264MP4Encoder) return false;
+
+  const w = STAGE_W*scale, h = STAGE_H*scale;
+  const off = document.createElement("canvas");
+  off.width = w; off.height = h;
+  const ctx = off.getContext("2d");
+  if(!ctx) return false;
+
+  exportState.active = true;
+  showExportOverlay("MP4 রেন্ডার হচ্ছে…");
+  try{
+    const enc = await HME.createH264MP4Encoder();
+    enc.width = w - (w % 2);
+    enc.height = h - (h % 2);
+    enc.frameRate = S.fps;
+    enc.kbps = scale === 1 ? 12000 : 40000;
+    enc.quantizationParameter = 20;
+    enc.initialize();
+
+    const total = frameCount();
+    for(let i=0;i<total;i++){
+      renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
+      const data = ctx.getImageData(0, 0, enc.width, enc.height).data;
+      enc.addFrameRgba(data);
+      showExportOverlay(`MP4 রেন্ডার হচ্ছে ${i+1}/${total}`);
+      await new Promise(r => setTimeout(r, 0));
+    }
+    showExportOverlay("MP4 ফাইল তৈরি হচ্ছে…");
+    enc.finalize();
+    const out = enc.FS.readFile(enc.outputFilename);
+    enc.delete();
+    downloadBlob(new Blob([out], { type:"video/mp4" }), mp4FileName(scale));
+    return true;
+  }catch(e){
+    return false;
+  }finally{
+    exportState.active = false;
+    hideExportOverlay();
+  }
+}
+
+async function exportVideo(scale){
+  if(exportState.active) return;
+  if(await exportVideoMp4WebCodecs(scale)) return;
+  if(exportState.active) exportState.active = false;
+  if(await exportVideoMp4Wasm(scale)) return;
+  if(exportState.active) exportState.active = false;
+  await exportVideoRecorder(scale);
+}
+
 
 function showExportOverlay(label){
   document.getElementById("exportLabel").textContent = label;
@@ -2835,3 +3052,4 @@ window.addEventListener("resize", resizeCanvas);
 
 </body>
 </html>
+ 
