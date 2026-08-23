@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8" />
@@ -73,15 +73,18 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .frame-counter{font-size:.7rem;color:var(--muted-foreground);white-space:nowrap;margin:0 .2rem;}
 .frame-counter span{color:var(--foreground);}
 
+.timeline-controls{display:flex;align-items:center;gap:.3rem;padding:.4rem .5rem;flex-wrap:wrap;}
+.timeline-controls .chip-xs{flex:1 1 auto;min-width:0;padding:.32rem .1rem;font-size:.58rem;gap:.1rem;overflow:hidden;text-overflow:ellipsis;}
+
 .timeline-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;gap:.2rem;padding-bottom:2px;}
 .timeline-head::-webkit-scrollbar{display:none;}
 .chip-xs{flex:1 1 0;min-width:0;padding:.32rem .1rem;font-size:.58rem;gap:.1rem;overflow:hidden;text-overflow:ellipsis;}
 
-.xsheet-wrap{overflow-x:auto;overflow-y:visible;border-radius:8px;border:1px solid var(--border);background:var(--secondary);-webkit-overflow-scrolling:touch;position:relative;}
+.xsheet-wrap{--audio-row-h:34px;overflow-x:auto;overflow-y:visible;border-radius:8px;border:1px solid var(--border);background:var(--secondary);-webkit-overflow-scrolling:touch;position:relative;}
 .xsheet-table{display:flex;flex-direction:column;min-width:max-content;}
 .xsheet-header-row,.xsheet-row{display:flex;height:34px;}
-.xsheet-header-row{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);}
-.xsheet-corner{position:sticky;left:0;z-index:20;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 4px;}
+.xsheet-header-row{position:sticky;top:var(--audio-row-h);z-index:25;background:var(--card);border-bottom:1px solid var(--border);}
+.xsheet-corner{position:sticky;left:0;z-index:26;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 4px;}
 .xsheet-colheads{display:flex;}
 .xsheet-colhead{width:36px;min-width:36px;border-right:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:.62rem;color:var(--muted-foreground);cursor:pointer;}
 .xsheet-colhead.current{color:var(--accent);font-weight:700;background:rgba(230,165,89,.1);}
@@ -100,17 +103,26 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .xsheet-kf-diamond{width:9px;height:9px;background:var(--accent);border:1px solid #2b1c0d;transform:rotate(45deg);position:relative;z-index:2;}
 .xsheet-kf-diamond.selected{background:#ffffff;}
 
-.audio-track-row{display:flex;min-height:40px;border-top:1px solid var(--border);background:rgba(0,0,0,.15);}
-.audio-track-rowhead{position:sticky;left:0;z-index:5;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;gap:.2rem;padding:0 4px;font-size:.62rem;}
+.audio-track-row{display:flex;height:var(--audio-row-h);border-bottom:1px solid rgba(255,255,255,.05);background:rgba(0,0,0,.16);position:sticky;top:0;z-index:30;}
+.audio-track-rowhead{position:sticky;left:0;z-index:60;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;gap:.2rem;padding:0 4px;font-size:.62rem;}
 .audio-track-rowhead .lname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.audio-track-cells{display:flex;align-items:flex-end;}
-.audio-track-cell{width:36px;min-width:36px;height:40px;border-right:1px solid rgba(255,255,255,.05);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;cursor:pointer;}
-.audio-track-cell.current-frame{background:rgba(230,165,89,.08);}
-.audio-track-bar{width:55%;min-height:3px;border-radius:2px;background:rgba(255,140,66,.28);}
-.audio-track-bar.has-voice{background:#ff8c2b;box-shadow:0 0 6px rgba(255,140,43,.55);}
-.audio-empty-hint{display:flex;align-items:center;padding:0 .5rem;font-size:.62rem;color:var(--muted-foreground);}
+.audio-track-lane{position:relative;height:var(--audio-row-h);flex:0 0 auto;isolation:isolate;background:repeating-linear-gradient(90deg,transparent 0 35px,rgba(255,255,255,.05) 35px 36px);touch-action:none;}
+.audio-clip{position:absolute;top:2px;height:calc(var(--audio-row-h) - 4px);border-radius:4px;background:rgba(255,140,43,.18);border:1px solid rgba(255,140,43,.5);overflow:hidden;touch-action:none;cursor:grab;}
+.audio-clip.selected{border-color:#ffd7a1;box-shadow:0 0 0 2px rgba(255,215,161,.55);background:rgba(255,140,43,.28);}
+.audio-clip canvas{display:block;width:100%;height:100%;pointer-events:none;}
+.audio-clip .clip-name{position:absolute;left:10px;top:1px;font-size:.5rem;color:#ffe6cc;pointer-events:none;white-space:nowrap;overflow:hidden;max-width:calc(100% - 20px);}
+.audio-split-btn{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:.6rem;line-height:1;padding:2px 6px;border-radius:10px;border:1px solid #ffd7a1;background:#241a12;color:#ffd7a1;z-index:45;cursor:pointer;}
+.audio-split-marker{position:absolute;top:0;height:100%;width:0;z-index:40;touch-action:none;}
+.audio-split-marker .line{position:absolute;left:-1px;top:0;width:2px;height:100%;background:#ffd7a1;box-shadow:0 0 4px rgba(255,215,161,.8);pointer-events:none;}
+.audio-split-marker .knob{position:absolute;left:0;top:50%;transform:translate(-50%,-50%);font-size:.6rem;line-height:1;padding:2px 5px;border-radius:10px;border:1px solid #ffd7a1;background:#241a12;color:#ffd7a1;cursor:ew-resize;white-space:nowrap;}
+.audio-playhead{position:absolute;top:0;width:2px;height:100%;background:var(--accent);pointer-events:none;z-index:50;touch-action:none;}
+.audio-playhead .ph-grip{position:absolute;left:1px;top:0;width:22px;height:100%;transform:translateX(-50%);pointer-events:auto;cursor:ew-resize;touch-action:none;background:transparent;}
+.audio-playhead .ph-knob{position:absolute;left:1px;top:1px;transform:translateX(-50%);width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 5px rgba(0,0,0,.6);pointer-events:none;}
+.audio-playhead.dragging .ph-knob{transform:translateX(-50%) scale(1.25);}
 
-.layer-popup-menu{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;box-shadow:var(--shadow-panel);width:90%;max-width:300px;max-height:70vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:1000;display:flex;flex-direction:column;gap:.5rem;}
+
+
+.layer-popup-menu{position:fixed;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;box-shadow:var(--shadow-panel);width:90%;max-width:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:1000;display:flex;flex-direction:column;gap:.5rem;}
 .layer-popup-menu.hidden{display:none;}
 .layer-item-box{background:var(--secondary);border:1px solid var(--border);border-radius:6px;padding:6px;display:flex;flex-direction:column;gap:4px;}
 .layer-item-row{display:flex;align-items:center;gap:4px;}
@@ -119,7 +131,8 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .swatch{width:1.7rem;height:1.7rem;border-radius:999px;border:2px solid var(--border);padding:0;}
 .swatch-on{border-color:var(--accent);transform:scale(1.12);}
 
-input[type=range]{width:100%;accent-color:var(--accent);}
+input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;padding:0;margin:0;display:block;vertical-align:middle;}
+#panelContent input[type=range]{width:78%;}
 .field{margin-top:.75rem;}
 .field:first-child{margin-top:0;}
 .stepper-row{display:flex;align-items:center;gap:.35rem;margin-top:.35rem;}
@@ -135,13 +148,51 @@ input[type=range]{width:100%;accent-color:var(--accent);}
 .export-hint{margin:.35rem 0 0;font-size:.72rem;color:var(--muted-foreground);}
 .compact-btn{padding:.2rem .35rem;font-size:.6rem;}
 
+/* ---------- Project Gallery ---------- */
+.gallery-overlay{position:fixed;inset:0;z-index:200;background:var(--background,#1c1917);overflow:auto;padding:.75rem;}
+.gallery-overlay.hidden{display:none;}
+.gallery-top{display:flex;align-items:center;gap:.4rem;margin-bottom:.75rem;flex-wrap:wrap;}
+.gallery-top h2{font-size:1rem;margin:0;flex:1;}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.6rem;}
+.proj-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;}
+.proj-card.current{border-color:var(--primary,#ff8a3d);}
+.proj-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;background:#000;display:block;}
+.proj-meta{padding:.35rem .45rem;}
+.proj-name{font-size:.72rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.proj-date{font-size:.6rem;color:var(--muted-foreground);}
+.proj-menu-btn{position:absolute;top:.25rem;right:.25rem;width:1.5rem;height:1.5rem;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:.8rem;line-height:1;cursor:pointer;}
+.proj-menu{position:absolute;top:1.9rem;right:.25rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);z-index:5;overflow:hidden;min-width:110px;}
+.proj-menu button{display:block;width:100%;padding:.4rem .5rem;background:none;border:none;color:inherit;font-size:.7rem;text-align:left;cursor:pointer;}
+.proj-menu button:hover{background:rgba(255,255,255,.08);}
+.gallery-empty{color:var(--muted-foreground);font-size:.8rem;padding:2rem 0;text-align:center;}
+
 @media(max-width:420px){.icon-btn{width:2rem;height:2rem;font-size:.75rem;}}
+
 </style>
 </head>
-
+<script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
 <body>
+<div id="authOverlay" style="position:fixed;inset:0;z-index:9999;background:#2c2620;display:flex;align-items:center;justify-content:center;padding:1rem;">
+  <div style="width:100%;max-width:340px;background:#3a3128;border:1px solid #55483a;border-radius:12px;padding:1.5rem;color:#f2ede0;font-family:Arial,sans-serif;">
+    <h2 id="authTitle" style="margin:0 0 1rem;text-align:center;">লগইন করুন</h2>
 
-<div id="app">
+    <div id="authRegisterFields" style="display:none;">
+      <input id="authName" type="text" placeholder="নাম" style="width:100%;padding:.6rem;margin-bottom:.6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
+    </div>
+    <input id="authEmail" type="email" placeholder="ইমেইল" style="width:100%;padding:.6rem;margin-bottom:.6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
+    <input id="authPassword" type="password" placeholder="পাসওয়ার্ড" style="width:100%;padding:.6rem;margin-bottom:.6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
+
+    <div id="authError" style="color:#d9694f;font-size:.75rem;margin-bottom:.6rem;display:none;"></div>
+
+    <button id="authSubmitBtn" style="width:100%;padding:.7rem;border:none;border-radius:6px;background:#e6a559;color:#2b1c0d;font-weight:700;margin-bottom:.6rem;">লগইন</button>
+
+    <div style="text-align:center;font-size:.8rem;">
+      <span id="authToggleText">অ্যাকাউন্ট নেই? </span>
+      <a href="#" id="authToggleLink" style="color:#e6a559;">রেজিস্ট্রেশন করুন</a>
+    </div>
+  </div>
+</div>
+<div id="app" class="hidden">
 
 <header class="topbar">
   <div class="title-block">
@@ -150,6 +201,7 @@ input[type=range]{width:100%;accent-color:var(--accent);}
 
   <button id="btnUndo" class="icon-btn">↶</button>
   <button id="btnRedo" class="icon-btn">↷</button>
+  <button id="btnProjects" class="chip compact-btn">📁 Files</button>
   <button id="btnImportAudio" class="chip compact-btn">+ Audio</button>
   <button id="btnImportGallery" class="chip compact-btn">+Gallery</button>
   <button id="btnExportTab" class="chip chip-accent compact-btn">Export</button>
@@ -171,48 +223,46 @@ input[type=range]{width:100%;accent-color:var(--accent);}
 
     <div class="tool-rail" id="toolRail"></div>
 
-    <div class="panel transport">
-      <div class="transport-left">
-        <button id="btnFirst" class="icon-btn">⏮</button>
-        <button id="btnPrev" class="icon-btn">◀</button>
-        <button id="btnPlay" class="icon-btn icon-btn-accent">▶</button>
-        <button id="btnNext" class="icon-btn">▶</button>
-        <div class="frame-counter">
-          <span id="frameCur">1</span>/<span id="frameTotal">1</span>
+    <div class="panel" style="display:flex;flex-direction:column;gap:.25rem;padding:.5rem .6rem;">
+      <div class="transport">
+        <div class="transport-left">
+          <button id="btnFirst" class="icon-btn">⏮</button>
+          <button id="btnPrev" class="icon-btn">◀</button>
+          <button id="btnPlay" class="icon-btn icon-btn-accent">▶</button>
+          <button id="btnNext" class="icon-btn">▶</button>
+          <div class="frame-counter">
+            <span id="frameCur">1</span>/<span id="frameTotal">1</span>
+          </div>
+        </div>
+
+        <div class="transport-right">
+          <div class="tool-item" style="display:inline-flex;">
+            <button id="btnFpsToggle" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">FPS: 12</button>
+            <div id="fpsDropdown" class="color-picker-dropdown hidden" style="width: 170px;">
+              <div class="field" style="margin:0;">
+                <div class="label" id="fpsLabel">Rate: 12 fps</div>
+                <input type="range" id="fpsRange" min="2" max="60" value="12" style="width:100%; margin-top:4px;" />
+                <div class="stepper-row" id="fpsStepperRow"></div>
+              </div>
+            </div>
+          </div>
+          <div class="tool-item" style="display:inline-flex;">
+            <button id="btnOnion" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">Onion</button>
+            <div id="onionDropdown" class="color-picker-dropdown hidden" style="width: 190px;">
+              <div class="field" style="margin:0;">
+                <button id="btnOnionToggle" class="chip w-full" style="margin-bottom:.5rem;">Onion: ON</button>
+                <div class="label">Before frames: <span id="onionBeforeLabel">1</span></div>
+                <div class="stepper-row" id="onionBeforeStepperRow"></div>
+                <div class="label" style="margin-top:.5rem;">After frames: <span id="onionAfterLabel">1</span></div>
+                <div class="stepper-row" id="onionAfterStepperRow"></div>
+              </div>
+            </div>
+          </div>
+          <button id="btnLoop" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">Loop</button>
         </div>
       </div>
 
-      <div class="transport-right">
-        <div class="tool-item" style="display:inline-flex;">
-          <button id="btnFpsToggle" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">FPS: 12</button>
-          <div id="fpsDropdown" class="color-picker-dropdown hidden" style="width: 170px;">
-            <div class="field" style="margin:0;">
-              <div class="label" id="fpsLabel">Rate: 12 fps</div>
-              <input type="range" id="fpsRange" min="2" max="60" value="12" style="width:100%; margin-top:4px;" />
-              <div class="stepper-row" id="fpsStepperRow"></div>
-            </div>
-          </div>
-        </div>
-        <div class="tool-item" style="display:inline-flex;">
-          <button id="btnOnion" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">Onion</button>
-          <div id="onionDropdown" class="color-picker-dropdown hidden" style="width: 190px;">
-            <div class="field" style="margin:0;">
-              <button id="btnOnionToggle" class="chip w-full" style="margin-bottom:.5rem;">Onion: ON</button>
-              <div class="label">Before frames: <span id="onionBeforeLabel">1</span></div>
-              <div class="stepper-row" id="onionBeforeStepperRow"></div>
-              <div class="label" style="margin-top:.5rem;">After frames: <span id="onionAfterLabel">1</span></div>
-              <div class="stepper-row" id="onionAfterStepperRow"></div>
-            </div>
-          </div>
-        </div>
-        <button id="btnLoop" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">Loop</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="scroll-area">
-    <div class="panel">
-      <div class="timeline-head">
+      <div class="timeline-controls" style="border-top:1px solid rgba(255,255,255,.08);padding-top:.3rem;">
         <button id="btnAddKeyframeTop" class="chip chip-xs chip-accent hidden">+KF</button>
         <button id="btnAddFrame" class="chip chip-xs">+Frame</button>
         <button id="btnDupFrame" class="chip chip-xs">Dup</button>
@@ -221,6 +271,11 @@ input[type=range]{width:100%;accent-color:var(--accent);}
         <button id="btnClear" class="chip chip-xs">Clear</button>
         <button id="btnDelFrame" class="chip chip-xs chip-danger">Del</button>
       </div>
+    </div>
+  </div>
+
+  <div class="scroll-area">
+    <div class="panel">
       <div class="xsheet-wrap" id="xsheetWrap">
         <div class="xsheet-table" id="timelineStrip"></div>
       </div>
@@ -229,6 +284,21 @@ input[type=range]{width:100%;accent-color:var(--accent);}
     <div id="panelContent"></div>
   </div>
 </main>
+
+<div id="galleryOverlay" class="gallery-overlay hidden">
+  <div class="gallery-top">
+    <h2 class="font-display">My Projects</h2>
+    <button id="btnGalleryUpdate" class="chip compact-btn hidden">⬆ Update</button>
+    <button id="btnGallerySaveAs" class="chip compact-btn">💾 Save As</button>
+
+    <button id="btnGalleryNew" class="chip chip-accent compact-btn">+ New Project</button>
+    <button id="btnGalleryClose" class="chip compact-btn">✕ Close</button>
+  </div>
+  
+ 
+  <div id="galleryGrid" class="gallery-grid"></div>
+  <div id="galleryEmpty" class="gallery-empty hidden">এখনো কোনো প্রজেক্ট সেভ করা হয়নি।</div>
+</div>
 
 <div id="exportOverlay" class="export-overlay hidden">
   <div class="panel">
@@ -247,6 +317,80 @@ input[type=range]{width:100%;accent-color:var(--accent);}
 <script>
 (function(){
 "use strict";
+
+/* ================= APPWRITE AUTH ================= */
+const APPWRITE_ENDPOINT = "https://fra.cloud.appwrite.io/v1";
+const APPWRITE_PROJECT_ID = "6a8a57160028eba38d7a";
+
+const awClient = new Appwrite.Client()
+  .setEndpoint(APPWRITE_ENDPOINT)
+  .setProject(APPWRITE_PROJECT_ID);
+const awAccount = new Appwrite.Account(awClient);
+/* ================= END APPWRITE AUTH (setup) ================= */
+
+let isRegisterMode = false;
+
+function showAuthError(msg){
+  const el = document.getElementById("authError");
+  el.textContent = msg;
+  el.style.display = "block";
+}
+function hideAuthError(){
+  document.getElementById("authError").style.display = "none";
+}
+
+function showApp(){
+  document.getElementById("authOverlay").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+}
+function showAuthScreen(){
+  document.getElementById("authOverlay").classList.remove("hidden");
+  document.getElementById("app").classList.add("hidden");
+}
+
+async function checkSession(){
+  try{
+    await awAccount.get();
+    showApp();
+  }catch(e){
+    showAuthScreen();
+  }
+}
+
+document.getElementById("authToggleLink").onclick = (e) => {
+  e.preventDefault();
+  isRegisterMode = !isRegisterMode;
+  document.getElementById("authTitle").textContent = isRegisterMode ? "রেজিস্ট্রেশন করুন" : "লগইন করুন";
+  document.getElementById("authRegisterFields").style.display = isRegisterMode ? "block" : "none";
+  document.getElementById("authSubmitBtn").textContent = isRegisterMode ? "রেজিস্ট্রেশন" : "লগইন";
+  document.getElementById("authToggleText").textContent = isRegisterMode ? "আগে থেকে অ্যাকাউন্ট আছে? " : "অ্যাকাউন্ট নেই? ";
+  document.getElementById("authToggleLink").textContent = isRegisterMode ? "লগইন করুন" : "রেজিস্ট্রেশন করুন";
+  hideAuthError();
+};
+
+document.getElementById("authSubmitBtn").onclick = async () => {
+  hideAuthError();
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const name = document.getElementById("authName").value.trim();
+
+  if(!email || !password){ showAuthError("ইমেইল ও পাসওয়ার্ড দিন"); return; }
+
+  try{
+    if(isRegisterMode){
+      if(!name){ showAuthError("নাম দিন"); return; }
+      await awAccount.create(Appwrite.ID.unique(), email, password, name);
+      await awAccount.createEmailPasswordSession(email, password);
+    } else {
+      await awAccount.createEmailPasswordSession(email, password);
+    }
+    showApp();
+  }catch(e){
+    showAuthError(e.message || "একটা সমস্যা হয়েছে");
+  }
+};
+
+checkSession();
 
 function setAppHeight(){
   const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
@@ -414,6 +558,22 @@ function clearDanglingParents(objs){
   return objs.map(o => (o.parentId && !ids.has(o.parentId)) ? { ...o, parentId: null, parentBindFrame: null } : o);
 }
 
+/* ---------- Pivot (anchor point) helpers ----------
+   pivotX / pivotY are fractional (0..1) values of the object's bounding box.
+   Default 0.5 / 0.5 = center. They are a per-object property (NOT animated
+   per keyframe) so shape-swap keeps the anchor in the right relative place. */
+function pivotOf(obj){
+  const px = obj && Number.isFinite(obj.pivotX) ? Math.max(0, Math.min(1, obj.pivotX)) : 0.5;
+  const py = obj && Number.isFinite(obj.pivotY) ? Math.max(0, Math.min(1, obj.pivotY)) : 0.5;
+  return { px, py };
+}
+
+function pivotPointOf(obj, t){
+  const p = pivotOf(obj);
+  return { x: t.x + p.px*t.w, y: t.y + p.py*t.h };
+}
+
+
 function worldTransformAt(obj, frame, visited){
   const local = objectTransformAt(obj, frame);
   if(!local || !obj.parentId) return local;
@@ -430,17 +590,20 @@ function worldTransformAt(obj, frame, visited){
   const parentBind = worldTransformAt(parentObj, bindFrame, visited);
   if(!parentNow || !parentBind) return local;
 
-  const cxNow = (parentNow.x + parentNow.w/2)*STAGE_W;
-  const cyNow = (parentNow.y + parentNow.h/2)*STAGE_H;
-  const cxBind = (parentBind.x + parentBind.w/2)*STAGE_W;
-  const cyBind = (parentBind.y + parentBind.h/2)*STAGE_H;
+  const pPar = pivotOf(parentObj);
+  const pSelf = pivotOf(obj);
+
+  const cxNow = (parentNow.x + pPar.px*parentNow.w)*STAGE_W;
+  const cyNow = (parentNow.y + pPar.py*parentNow.h)*STAGE_H;
+  const cxBind = (parentBind.x + pPar.px*parentBind.w)*STAGE_W;
+  const cyBind = (parentBind.y + pPar.py*parentBind.h)*STAGE_H;
 
   const scaleW = parentBind.w>1e-6 ? parentNow.w/parentBind.w : 1;
   const scaleH = parentBind.h>1e-6 ? parentNow.h/parentBind.h : 1;
   const deltaRot = parentNow.rotation - parentBind.rotation;
 
-  const childCxPx = (local.x+local.w/2)*STAGE_W;
-  const childCyPx = (local.y+local.h/2)*STAGE_H;
+  const childCxPx = (local.x + pSelf.px*local.w)*STAGE_W;
+  const childCyPx = (local.y + pSelf.py*local.h)*STAGE_H;
 
   let offX = (childCxPx - cxBind) * scaleW;
   let offY = (childCyPx - cyBind) * scaleH;
@@ -456,8 +619,8 @@ function worldTransformAt(obj, frame, visited){
 
   return {
     frame,
-    x: worldCxPx/STAGE_W - worldW/2,
-    y: worldCyPx/STAGE_H - worldH/2,
+    x: worldCxPx/STAGE_W - pSelf.px*worldW,
+    y: worldCyPx/STAGE_H - pSelf.py*worldH,
     w: worldW,
     h: worldH,
     rotation: local.rotation + deltaRot,
@@ -509,6 +672,25 @@ function loadImage(src){
     img.src = src;
   });
 }
+
+// প্রজেক্ট লোড/রিস্টোরের পর প্রতিটি image object-এর src (base + shape library)
+// আবার decode করে imageCache-এ rebuild করে, যাতে canvas ফাঁকা না থাকে।
+async function preloadImageObjectSources(objects){
+  const srcs = new Set();
+  (objects || []).forEach(o => {
+    if(o && typeof o.src === "string" && o.src) srcs.add(o.src);
+    (o && Array.isArray(o.shapes) ? o.shapes : []).forEach(sh => {
+      if(sh && typeof sh.src === "string" && sh.src) srcs.add(sh.src);
+    });
+  });
+  // broken/অসম্পূর্ণ cache entry বাদ দাও, যাতে নতুন করে decode হয়
+  srcs.forEach(src => {
+    const c = imageCache.get(src);
+    if(c && !c.complete) imageCache.delete(src);
+  });
+  await Promise.all([...srcs].map(src => loadImage(src).catch(()=>null)));
+}
+
 
 function pathStroke(ctx,s,sx,sy){
   const p = s.pts;
@@ -636,15 +818,19 @@ function drawImageObjectsForLayer(ctx, imageObjects, layerId, layerOpacity, fram
     const img = imageCache.get(shape.src);
     if(!img || !img.complete) return;
 
-    const cx = (t.x + t.w/2)*w;
-    const cy = (t.y + t.h/2)*h;
+    const pv = pivotOf(o);
+    const cx = (t.x + pv.px*t.w)*w;
+    const cy = (t.y + pv.py*t.h)*h;
+    const dw = t.w*w, dh = t.h*h;
     ctx.save();
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = layerOpacity * Math.max(0, Math.min(1, t.opacity));
     ctx.translate(cx, cy);
     ctx.rotate(t.rotation);
     ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
-    ctx.drawImage(img, -t.w*w/2, -t.h*h/2, t.w*w, t.h*h);
+    const ox = (t.flipX ? -(1-pv.px) : -pv.px)*dw;
+    const oy = (t.flipY ? -(1-pv.py) : -pv.py)*dh;
+    ctx.drawImage(img, ox, oy, dw, dh);
     ctx.restore();
   });
 }
@@ -684,10 +870,13 @@ function drawSelectionBox(ctx, obj, w, h){
   const t = worldTransformAt(obj, S.frame);
   if(!t) return;
 
-  const cx = (t.x + t.w/2)*w;
-  const cy = (t.y + t.h/2)*h;
-  const hw = t.w*w/2;
-  const hh = t.h*h/2;
+  const pv = pivotOf(obj);
+  const W = t.w*w, H = t.h*h;
+  const cx = (t.x + pv.px*t.w)*w;
+  const cy = (t.y + pv.py*t.h)*h;
+  const left = -pv.px*W, right = (1-pv.px)*W;
+  const top = -pv.py*H, bottom = (1-pv.py)*H;
+  const midX = left + W/2;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -696,26 +885,43 @@ function drawSelectionBox(ctx, obj, w, h){
   ctx.strokeStyle = "#e6a559";
   ctx.lineWidth = 2;
   ctx.setLineDash([6,4]);
-  ctx.strokeRect(-hw, -hh, hw*2, hh*2);
+  ctx.strokeRect(left, top, W, H);
   ctx.setLineDash([]);
 
-  const rY = -hh-30;
+  const rY = top-30;
   ctx.beginPath();
-  ctx.moveTo(0, -hh);
-  ctx.lineTo(0, rY);
+  ctx.moveTo(midX, top);
+  ctx.lineTo(midX, rY);
   ctx.stroke();
 
   ctx.fillStyle = "#e6a559";
   ctx.strokeStyle = "#2b1c0d";
   ctx.lineWidth = 1.5;
 
+  // rotate handle
   ctx.beginPath();
-  ctx.arc(0, rY, 8, 0, Math.PI*2);
+  ctx.arc(midX, rY, 8, 0, Math.PI*2);
   ctx.fill(); ctx.stroke();
 
+  // scale handle (bottom-right corner)
   ctx.beginPath();
-  ctx.arc(hw, hh, 8, 0, Math.PI*2);
+  ctx.arc(right, bottom, 8, 0, Math.PI*2);
   ctx.fill(); ctx.stroke();
+
+  // pivot handle (anchor point) at local origin
+  ctx.beginPath();
+  ctx.strokeStyle = "#f2ede0";
+  ctx.lineWidth = 1.5;
+  ctx.moveTo(-11, 0); ctx.lineTo(11, 0);
+  ctx.moveTo(0, -11); ctx.lineTo(0, 11);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI*2);
+  ctx.fillStyle = "#2b1c0d";
+  ctx.fill();
+  ctx.strokeStyle = "#f2ede0";
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   ctx.restore();
 }
@@ -725,6 +931,7 @@ const S = {
   imageObjects: [],
   selectedObjectId: null,
   activeLayer: 0,
+  focus: 'layer',
   frame: 0,
   tool: "brush",
   color: PALETTE[0],
@@ -739,7 +946,12 @@ const S = {
   playing: false,
   view: { z: 1, x: 0, y: 0 },
   bg: "#ffffff",
-  audio: null
+  audioClips: [],
+  selectedAudioClipId: null,
+  audioSplitFrame: null,
+  currentProjectId: null,
+  // কোন ভিউ খোলা আছে: 'canvas' বা 'files'
+  currentView: "canvas"
 };
 
 let past = [];
@@ -754,6 +966,13 @@ const exportState = { active: false };
 
 function frameCount(){
   return S.layers[0] ? S.layers[0].frames.length : 1;
+}
+
+function ensureFrameCount(n){
+  const cur = frameCount();
+  if(n <= cur) return;
+  const add = n - cur;
+  commit(ls => ls.map(l => ({ ...l, frames: [...l.frames, ...Array.from({length:add}, ()=>[])] })));
 }
 
 function commit(mutator){
@@ -802,21 +1021,168 @@ function redo(){
   renderAll();
 }
 
+/* ---------- IndexedDB (অডিও ক্লিপ) ---------- */
+const AUDIO_DB_NAME = "frameo-studio-audio";
+const AUDIO_STORE = "clips";
+let audioDbPromise = null;
+function openAudioDb(){
+  if(audioDbPromise) return audioDbPromise;
+  audioDbPromise = new Promise((resolve, reject)=>{
+    try{
+      const req = indexedDB.open(AUDIO_DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(AUDIO_STORE)) db.createObjectStore(AUDIO_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }catch(e){ reject(e); }
+  }).catch(()=>null);
+  return audioDbPromise;
+}
+function audioClipSignature(){
+  return S.audioClips.map(c => [c.id, c.startFrame, c.trimStart, c.trimEnd, c.volume, c.fileName].join(":")).join("|");
+}
+let lastAudioSignature = null;
+/* IndexedDB থেকে অডিও ফিরে আসার আগে কখনোই সেভ করা যাবে না —
+   নইলে খালি array দিয়ে পুরনো ক্লিপ মুছে যেতে পারে */
+let audioRestoreDone = false;
+async function saveAudioClips(force){
+  if(!audioRestoreDone) return;
+  const sig = audioClipSignature();
+  if(!force && sig === lastAudioSignature) return;
+  lastAudioSignature = sig;
+  const db = await openAudioDb();
+  if(!db) return;
+  try{
+    const payload = S.audioClips.map(c => ({
+      id: c.id,
+      fileName: c.fileName,
+      fileType: c.fileType || "",
+      fileBytes: c.fileBytes || null,
+      samples: c.samples,
+      sampleRate: c.sampleRate,
+      fileDuration: c.fileDuration,
+      startFrame: c.startFrame,
+      trimStart: c.trimStart,
+      trimEnd: c.trimEnd,
+      volume: c.volume
+    }));
+    await new Promise(resolve => {
+      const tx = db.transaction(AUDIO_STORE, "readwrite");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+      tx.objectStore(AUDIO_STORE).put(payload, "clips");
+    });
+  }catch(e){}
+}
+async function restoreAudioClips(){
+  const db = await openAudioDb();
+  if(!db){ audioRestoreDone = true; return false; }
+  const rows = await new Promise(resolve=>{
+    try{
+      const req = db.transaction(AUDIO_STORE, "readonly").objectStore(AUDIO_STORE).get("clips");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    }catch(e){ resolve(null); }
+  });
+  if(!Array.isArray(rows) || !rows.length){ audioRestoreDone = true; return false; }
+  S.audioClips = rows.map(r => {
+    let objectUrl = null;
+    if(r.fileBytes){
+      try{ objectUrl = URL.createObjectURL(new Blob([r.fileBytes], { type: r.fileType || "audio/mpeg" })); }catch(e){}
+    }
+    const clip = {
+      ...r,
+      src: objectUrl,
+      objectUrl,
+      samples: r.samples instanceof Float32Array ? r.samples : new Float32Array(r.samples || [])
+    };
+    refreshClipFrames(clip);
+    return clip;
+  });
+  lastAudioSignature = audioClipSignature();
+  audioRestoreDone = true;
+  let need = 0;
+  S.audioClips.forEach(c => { need = Math.max(need, clipEndFrame(c)); });
+  if(need > frameCount()) ensureFrameCount(need);
+  return true;
+}
+
+
+/* প্রজেক্ট লোড/রিস্টোরের সময় image object তালিকা সম্পূর্ণভাবে নতুন করে বানায় —
+   পুরনো প্রজেক্টের leftover/dangling object কখনো টিকে থাকবে না */
+function sanitizeImageObjects(rawObjects, layers, opts){
+  const list = Array.isArray(rawObjects) ? rawObjects : [];
+  const validIds = new Set((layers||[]).map(l => l.id));
+  let out = list.map(o => {
+    let layerId = o.layerId;
+    if(!layerId || !validIds.has(layerId)){
+      const lo = (layers||[])[o.layer];
+      layerId = lo ? lo.id : null;
+    }
+    return {
+      parentId: null, parentBindFrame: null, group: "",
+      pivotX: 0.5, pivotY: 0.5,
+      shapes: [], shapeKeyframes: [],
+      ...o,
+      layerId
+    };
+  }).filter(o => o.layerId && validIds.has(o.layerId));
+  const seen = new Set();
+  out = out.filter(o => {
+    if(!o.id) o.id = uid();
+    if(seen.has(o.id)) return false;
+    seen.add(o.id);
+    return true;
+  });
+  out = out.map(dedupeIdenticalKeyframes);
+  if(opts && opts.mergeOverlapping) out = dedupeOverlappingImageObjects(out);
+  out = clearDanglingParents(out);
+  return out;
+}
+
+function autosaveSnapshot(){
+  return {
+    layers: S.layers,
+    imageObjects: S.imageObjects,
+    fps: S.fps,
+    onionBefore: S.onionBefore,
+    onionAfter: S.onionAfter,
+    onion: S.onion,
+    // session / UI অবস্থা
+    frame: S.frame,
+    activeLayer: S.activeLayer,
+    focus: S.focus,
+    tool: S.tool,
+    color: S.color,
+    brushSize: S.brushSize,
+    brushOpacity: S.brushOpacity,
+    eraserSize: S.eraserSize,
+    view: S.view,
+    bg: S.bg,
+    loop: S.loop,
+    selectedObjectId: S.selectedObjectId,
+    selectedAudioClipId: S.selectedAudioClipId,
+    currentProjectId: S.currentProjectId || null,
+    currentView: S.currentView === "files" ? "files" : "canvas",
+    savedAt: Date.now()
+  };
+}
+
+function autosaveNow(){
+  clearTimeout(autosaveTimer);
+  try{
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(autosaveSnapshot()));
+  }catch(e){}
+  saveAudioClips();
+  /* Saved gallery projects are independent snapshots — never auto-overwritten */
+}
+
 function autosave(){
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(()=>{
-    try{
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
-        layers: S.layers,
-        imageObjects: S.imageObjects,
-        fps: S.fps,
-        onionBefore: S.onionBefore,
-        onionAfter: S.onionAfter,
-        onion: S.onion,
-        savedAt: Date.now()
-      }));
-    }catch(e){}
-  }, 500);
+  autosaveTimer = setTimeout(autosaveNow, 500);
 }
 
 function tryRestore(){
@@ -826,31 +1192,35 @@ function tryRestore(){
     const data = JSON.parse(raw);
     if(data && Array.isArray(data.layers) && data.layers.length){
       S.layers = data.layers;
-      S.imageObjects = Array.isArray(data.imageObjects) ? data.imageObjects : [];
-      S.imageObjects = S.imageObjects.map(o=>{
-        if(o.layerId) return o;
-        const lo = S.layers[o.layer];
-        return { ...o, layerId: lo ? lo.id : (S.layers[0] && S.layers[0].id) };
-      }).filter(o=>o.layerId);
-
-      S.imageObjects = S.imageObjects.map(o => ({
-        parentId: null, parentBindFrame: null, group: "",
-        shapes: [], shapeKeyframes: [],
-        ...o
-      }));
-      S.imageObjects = S.imageObjects.map(dedupeIdenticalKeyframes);
-      S.imageObjects = dedupeOverlappingImageObjects(S.imageObjects);
-      S.imageObjects = clearDanglingParents(S.imageObjects);
+      S.imageObjects = sanitizeImageObjects(data.imageObjects, S.layers, { mergeOverlapping: true });
 
       S.layers = S.layers.map(l => ({
         ...l,
         frames: l.frames.map(f => f.filter(s => s.tool!=="image"))
       }));
 
+
       if(data.fps) S.fps = data.fps;
       if(typeof data.onion === "boolean") S.onion = data.onion;
       if(Number.isFinite(data.onionBefore)) S.onionBefore = data.onionBefore;
       if(Number.isFinite(data.onionAfter)) S.onionAfter = data.onionAfter;
+
+      // session / UI অবস্থা
+      if(TOOLS.some(t => t.id === data.tool) && data.tool !== "settings") S.tool = data.tool;
+      if(typeof data.color === "string") S.color = data.color;
+      if(Number.isFinite(data.brushSize)) S.brushSize = data.brushSize;
+      if(Number.isFinite(data.brushOpacity)) S.brushOpacity = data.brushOpacity;
+      if(Number.isFinite(data.eraserSize)) S.eraserSize = data.eraserSize;
+      if(typeof data.bg === "string") S.bg = data.bg;
+      if(typeof data.loop === "boolean") S.loop = data.loop;
+      if(data.view && Number.isFinite(data.view.z)) S.view = { z: data.view.z, x: data.view.x || 0, y: data.view.y || 0 };
+      if(Number.isFinite(data.activeLayer)) S.activeLayer = Math.max(0, Math.min(S.layers.length-1, data.activeLayer));
+      if(Number.isFinite(data.frame)) S.frame = Math.max(0, Math.min(frameCount()-1, data.frame));
+      if(data.focus === "audio" || data.focus === "layer") S.focus = data.focus;
+      if(data.selectedObjectId && S.imageObjects.some(o=>o.id===data.selectedObjectId)) S.selectedObjectId = data.selectedObjectId;
+      if(data.selectedAudioClipId) S.selectedAudioClipId = data.selectedAudioClipId;
+      if(data.currentProjectId) S.currentProjectId = data.currentProjectId;
+      if(data.currentView === "files" || data.currentView === "canvas") S.currentView = data.currentView;
       return true;
     }
   }catch(e){}
@@ -933,11 +1303,7 @@ function startPlayback(){
         return;
       }
       nextFrame = 0;
-      if(S.audio){
-        const audioEl = document.getElementById("audioEl");
-        audioEl.currentTime = 0;
-        if(S.playing) audioEl.play().catch(()=>{});
-      }
+      startAudioPlaybackFromFrame(0);
     }
 
     S.frame = nextFrame;
@@ -981,10 +1347,13 @@ function objectHitTest(obj, pxPoint){
   const t = worldTransformAt(obj, S.frame);
   if(!t) return null;
   const w = canvas.width, h = canvas.height;
-  const cx = (t.x + t.w/2)*w;
-  const cy = (t.y + t.h/2)*h;
-  const hw = t.w*w/2;
-  const hh = t.h*h/2;
+  const pv = pivotOf(obj);
+  const W = t.w*w, H = t.h*h;
+  const cx = (t.x + pv.px*t.w)*w;
+  const cy = (t.y + pv.py*t.h)*h;
+  const left = -pv.px*W, right = (1-pv.px)*W;
+  const top = -pv.py*H, bottom = (1-pv.py)*H;
+  const midX = left + W/2;
 
   const dx = pxPoint.x - cx;
   const dy = pxPoint.y - cy;
@@ -994,11 +1363,34 @@ function objectHitTest(obj, pxPoint){
   const ly = dx*sin + dy*cos;
 
   const HR = 24;
-  if(Math.hypot(lx-hw, ly-hh) <= HR) return "scale";
-  const rY = -hh-30;
-  if(Math.hypot(lx-0, ly-rY) <= HR) return "rotate";
-  if(Math.abs(lx)<=hw && Math.abs(ly)<=hh) return "move";
+  if(Math.hypot(lx, ly) <= 20) return "pivot";
+  if(Math.hypot(lx-right, ly-bottom) <= HR) return "scale";
+  const rY = top-30;
+  if(Math.hypot(lx-midX, ly-rY) <= HR) return "rotate";
+  if(lx>=left && lx<=right && ly>=top && ly<=bottom) return "move";
   return null;
+}
+
+/* Move the pivot without visually moving the object: every keyframe's
+   top-left is compensated by (I - R) * delta, because the object is now
+   rendered rotated around the new anchor. */
+function applyPivotChange(obj, startKfs, oldPivot, newPivot){
+  obj.pivotX = newPivot.px;
+  obj.pivotY = newPivot.py;
+  const dpx = newPivot.px - oldPivot.px;
+  const dpy = newPivot.py - oldPivot.py;
+
+  obj.keyframes.forEach((kf, i)=>{
+    const s = startKfs[i];
+    if(!s) return;
+    const dX = dpx * s.w * STAGE_W;
+    const dY = dpy * s.h * STAGE_H;
+    const cos = Math.cos(s.rotation), sin = Math.sin(s.rotation);
+    const rX = dX*cos - dY*sin;
+    const rY = dX*sin + dY*cos;
+    kf.x = s.x - (dX - rX)/STAGE_W;
+    kf.y = s.y - (dY - rY)/STAGE_H;
+  });
 }
 
 function applyDragUpdate(drag, p){
@@ -1020,20 +1412,40 @@ function applyDragUpdate(drag, p){
     kf.y = drag.startTransform.y + dyPx/h;
   }
   else if(drag.mode==="scale"){
+    // scale around the pivot point, not the center
     const curDist = Math.hypot(p.x-drag.centerPx.x, p.y-drag.centerPx.y) || 1;
     const ratio = Math.max(0.05, curDist/drag.startDist);
     const newW = Math.max(0.02, drag.startTransform.w*ratio);
     const newH = Math.max(0.02, drag.startTransform.h*ratio);
-    const cx = drag.startTransform.x + drag.startTransform.w/2;
-    const cy = drag.startTransform.y + drag.startTransform.h/2;
+    const pv = drag.pivot;
+    const anchorX = drag.startTransform.x + pv.px*drag.startTransform.w;
+    const anchorY = drag.startTransform.y + pv.py*drag.startTransform.h;
     kf.w = newW; kf.h = newH;
-    kf.x = cx - newW/2;
-    kf.y = cy - newH/2;
+    kf.x = anchorX - pv.px*newW;
+    kf.y = anchorY - pv.py*newH;
   }
   else if(drag.mode==="rotate"){
+    // rotate around the pivot point
     const startAng = Math.atan2(drag.startPointer.y-drag.centerPx.y, drag.startPointer.x-drag.centerPx.x);
     const curAng = Math.atan2(p.y-drag.centerPx.y, p.x-drag.centerPx.x);
     kf.rotation = drag.startTransform.rotation + (curAng-startAng);
+  }
+  else if(drag.mode==="pivot"){
+    const obj = findObjectById(drag.objId);
+    if(!obj) return;
+    const t = drag.startWorld;
+    const W = t.w*w, H = t.h*h;
+    if(W<1e-6 || H<1e-6) return;
+    const dx = p.x - drag.centerPx.x;
+    const dy = p.y - drag.centerPx.y;
+    const cos = Math.cos(-t.rotation), sin = Math.sin(-t.rotation);
+    const lx = dx*cos - dy*sin;
+    const ly = dx*sin + dy*cos;
+    const np = {
+      px: Math.max(0, Math.min(1, drag.pivot.px + lx/W)),
+      py: Math.max(0, Math.min(1, drag.pivot.py + ly/H))
+    };
+    applyPivotChange(obj, drag.startKfs, drag.pivot, np);
   }
 }
 
@@ -1079,23 +1491,30 @@ canvas.addEventListener("pointerdown", e=>{
     if(hitObj){
       const preState = { layers: S.layers, imageObjects: cloneImageObjects(S.imageObjects) };
 
+      focusLayer();
       S.selectedObjectId = hitObj.id;
 
-      const kf = getOrCreateKeyframeAtCurrentFrame(hitObj);
+      const kf = hitMode==="pivot" ? (hitObj.keyframes[0]||null) : getOrCreateKeyframeAtCurrentFrame(hitObj);
       const w = canvas.width, h = canvas.height;
       const worldNow = worldTransformAt(hitObj, S.frame) || kf;
-      const centerPx = { x:(worldNow.x+worldNow.w/2)*w, y:(worldNow.y+worldNow.h/2)*h };
+      const pv = pivotOf(hitObj);
+      // all rotation / scale / pivot drags orbit the pivot point
+      const centerPx = { x:(worldNow.x + pv.px*worldNow.w)*w, y:(worldNow.y + pv.py*worldNow.h)*h };
       const startDist = Math.hypot(p.x-centerPx.x, p.y-centerPx.y) || 1;
       const parentAdjust = getParentAdjustFactors(hitObj, S.frame);
 
       transformDrag = {
         objId: hitObj.id, mode: hitMode, kf,
         startPointer: p,
-        startTransform: { x:kf.x, y:kf.y, w:kf.w, h:kf.h, rotation:kf.rotation },
+        startTransform: kf ? { x:kf.x, y:kf.y, w:kf.w, h:kf.h, rotation:kf.rotation } : null,
+        pivot: pv,
+        startWorld: worldNow,
+        startKfs: hitObj.keyframes.map(k=>({ ...k })),
         centerPx, startDist, preState, parentAdjust
       };
       canvas.setPointerCapture(e.pointerId);
     } else {
+      focusLayer();
       S.selectedObjectId = null;
     }
     renderAll();
@@ -1222,8 +1641,10 @@ function copyCurrentFrame(){
     const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
     if(!obj){ alert("কপি করার মতো কোনো ছবি সিলেক্ট করা নেই!"); return; }
     const t = objectTransformAt(obj, S.frame);
+    const cpv = pivotOf(obj);
     clipboardImageObject = {
       src: obj.src, natW: obj.natW, natH: obj.natH,
+      pivotX: cpv.px, pivotY: cpv.py,
       transform: { x:t.x, y:t.y, w:t.w, h:t.h, rotation:t.rotation, opacity:t.opacity, flipX: !!t.flipX, flipY: !!t.flipY }
     };
     alert("ছবি কপি করা হয়েছে!");
@@ -1249,11 +1670,14 @@ function pasteToCurrentFrame(){
     const newObj = {
       id: objId, layerId: activeL.id, src: c.src, natW: c.natW, natH: c.natH,
       parentId: null, parentBindFrame: null, group: "",
+      pivotX: Number.isFinite(c.pivotX) ? c.pivotX : 0.5,
+      pivotY: Number.isFinite(c.pivotY) ? c.pivotY : 0.5,
       shapes: [], shapeKeyframes: [],
       keyframes: [{ frame:S.frame, ...c.transform, easing:"linear" }]
     };
 
     commit((ls, objs) => ({ imageObjects: [...objs, newObj] }));
+    focusLayer();
     S.selectedObjectId = objId;
     renderAll();
     return;
@@ -1415,12 +1839,14 @@ async function importPhoto(file){
     layerId: S.layers[S.activeLayer].id,
     src, natW, natH,
     parentId: null, parentBindFrame: null, group: "",
+    pivotX: 0.5, pivotY: 0.5,
     shapes: [], shapeKeyframes: [],
     keyframes: [ { frame: S.frame, x, y, w, h, rotation: 0, opacity: 1, flipX: false, flipY: false, easing: "linear" } ]
   };
 
   commit((ls, objs) => ({ imageObjects: [...objs, newObj] }));
 
+  focusLayer();
   S.selectedObjectId = objId;
   S.tool = "select";
   renderAll();
@@ -1460,19 +1886,118 @@ function removeShapeFromLibrary(obj, shapeId){
   renderAll();
 }
 
-const AUDIO_VOICE_THRESHOLD = 0.02;
+/* ================= AUDIO ENGINE (CapCut-style multi-clip) ================= */
+
+let audioCtx = null;
+let activeAudioSources = [];
+
+function ensureAudioCtx(){
+  if(!audioCtx){
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return null;
+    audioCtx = new AudioCtx();
+  }
+  if(audioCtx.state === "suspended"){ try{ audioCtx.resume(); }catch(e){} }
+  return audioCtx;
+}
+
+function clipDurationSec(clip){
+  return Math.max(0, (clip.trimEnd - clip.trimStart));
+}
+function clipDurationFrames(clip){
+  return Math.max(1, Math.round(clipDurationSec(clip)*S.fps));
+}
+function clipEndFrame(clip){
+  return clip.startFrame + clipDurationFrames(clip);
+}
+function refreshClipFrames(clip){
+  clip.durationFrames = clipDurationFrames(clip);
+  return clip;
+}
+function selectedAudioClip(){
+  return S.audioClips.find(c => c.id === S.selectedAudioClipId) || null;
+}
+function focusAudio(){
+  S.focus = 'audio';
+  S.selectedObjectId = null;
+}
+function focusLayer(){
+  S.focus = 'layer';
+  S.selectedAudioClipId = null;
+  S.audioSplitFrame = null;
+}
+
+function makeAudioBuffer(clip){
+  const ctx = ensureAudioCtx();
+  if(!ctx) return null;
+  if(clip._buffer && clip._buffer.sampleRate === clip.sampleRate) return clip._buffer;
+  const buf = ctx.createBuffer(1, clip.samples.length, clip.sampleRate);
+  buf.copyToChannel(clip.samples, 0);
+  clip._buffer = buf;
+  return buf;
+}
+
+/* ---- audio scrubbing (short preview while dragging the playhead) ---- */
+let scrubSource = null, scrubGain = null, scrubLastFrame = -1;
+
+function stopScrubSource(){
+  if(scrubSource){
+    try{ scrubSource.stop(); }catch(e){}
+    try{ scrubSource.disconnect(); }catch(e){}
+    scrubSource = null;
+  }
+  if(scrubGain){ try{ scrubGain.disconnect(); }catch(e){} scrubGain = null; }
+}
+
+function scrubAudioAtFrame(frame, force){
+  if(!force && frame === scrubLastFrame) return;
+  scrubLastFrame = frame;
+  if(!S.audioClips || !S.audioClips.length) return;
+  const clip = S.audioClips.find(c => frame >= c.startFrame && frame < clipEndFrame(c));
+  if(!clip || !clip.samples || !clip.samples.length) return;
+  const ctx = ensureAudioCtx();
+  if(!ctx) return;
+  const buf = makeAudioBuffer(clip);
+  if(!buf) return;
+  const offset = clip.trimStart + (frame - clip.startFrame)/S.fps;
+  if(offset < 0 || offset >= clip.trimEnd) return;
+  const dur = Math.min(0.08, clip.trimEnd - offset);
+  if(dur <= 0.005) return;
+
+  stopScrubSource();
+  const now = ctx.currentTime;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(1, now + 0.008);
+  g.gain.setValueAtTime(1, now + Math.max(0.009, dur - 0.012));
+  g.gain.linearRampToValueAtTime(0, now + dur);
+  g.connect(ctx.destination);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(g);
+  src.start(now, offset, dur);
+  src.onended = () => { if(scrubSource === src){ scrubSource = null; } try{ g.disconnect(); }catch(e){} };
+  scrubSource = src;
+  scrubGain = g;
+}
+
+function endAudioScrub(){
+  stopScrubSource();
+  scrubLastFrame = -1;
+}
+
 
 async function importAudioFile(file){
   if(!file) return;
 
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if(!AudioCtx){ alert("এই ব্রাউজারে অডিও প্রসেসিং সাপোর্ট করে না।"); return; }
+  const ctx = ensureAudioCtx();
+  if(!ctx){ alert("এই ব্রাউজারে অডিও প্রসেসিং সাপোর্ট করে না।"); return; }
 
   const arrayBuf = await file.arrayBuffer();
-  const actx = new AudioCtx();
+  const fileBytes = arrayBuf.slice(0); // decodeAudioData মূল buffer detach করে দেয়
   let decoded;
   try{
-    decoded = await actx.decodeAudioData(arrayBuf);
+    decoded = await ctx.decodeAudioData(arrayBuf);
   }catch(e){
     alert("অডিও ফাইলটি পড়া যায়নি: " + (e && e.message ? e.message : String(e)));
     return;
@@ -1486,67 +2011,155 @@ async function importAudioFile(file){
     for(let i=0; i<len; i++) mono[i] += chData[i]/chCount;
   }
 
-  if(S.audio && S.audio.objectUrl){
-    URL.revokeObjectURL(S.audio.objectUrl);
-  }
   const objectUrl = URL.createObjectURL(file);
 
-  S.audio = {
-    src: objectUrl, objectUrl, fileName: file.name, samples: mono,
-    sampleRate: decoded.sampleRate, duration: decoded.duration
+  // নতুন ক্লিপ শেষ ক্লিপের পরে বসাও (ওভারল্যাপ এড়াতে)
+  let startFrame = 0;
+  S.audioClips.forEach(c => { startFrame = Math.max(startFrame, clipEndFrame(c)); });
+
+  const clip = {
+    id: uid(),
+    src: objectUrl,
+    objectUrl,
+    fileName: file.name,
+    fileType: file.type || "",
+    fileBytes,
+    samples: mono,
+    sampleRate: decoded.sampleRate,
+    fileDuration: decoded.duration,
+    startFrame,
+    trimStart: 0,
+    trimEnd: decoded.duration,
+    volume: 1
   };
+  refreshClipFrames(clip);
 
-  const audioEl = document.getElementById("audioEl");
-  audioEl.muted = false;
-  audioEl.volume = 1;
-  audioEl.src = objectUrl;
-  audioEl.load();
+  S.audioClips = [...S.audioClips, clip];
+  S.selectedAudioClipId = clip.id;
+  S.audioSplitFrame = null;
+  focusAudio();
+
+  const need = startFrame + clip.durationFrames;
+  if(need > frameCount()) ensureFrameCount(need);
 
   renderAll();
+  saveAudioClips(true);
 }
 
-function removeAudio(){
-  if(S.audio && S.audio.objectUrl){
-    URL.revokeObjectURL(S.audio.objectUrl);
-  }
-  S.audio = null;
-  const audioEl = document.getElementById("audioEl");
-  audioEl.pause();
-  audioEl.removeAttribute("src");
-  audioEl.load();
+
+function removeAudioClip(clipId){
+  const clip = S.audioClips.find(c=>c.id===clipId);
+  if(!clip) return;
+  const stillUsed = S.audioClips.some(c => c.id!==clipId && c.objectUrl===clip.objectUrl);
+  if(clip.objectUrl && !stillUsed){ try{ URL.revokeObjectURL(clip.objectUrl); }catch(e){} }
+  S.audioClips = S.audioClips.filter(c=>c.id!==clipId);
+  if(S.selectedAudioClipId===clipId){ S.selectedAudioClipId = null; S.audioSplitFrame = null; if(!S.audioClips.length) S.focus = 'layer'; }
+  stopAudioPlayback();
   renderAll();
+  saveAudioClips(true);
+
 }
 
-function audioAmplitudeForFrame(frameIndex){
-  if(!S.audio || !S.audio.samples || !S.audio.samples.length) return 0;
-  const sr = S.audio.sampleRate;
-  const startT = frameIndex / S.fps;
-  const endT = (frameIndex+1) / S.fps;
-  const startIdx = Math.max(0, Math.floor(startT*sr));
-  const endIdx = Math.min(S.audio.samples.length, Math.ceil(endT*sr));
-  if(endIdx <= startIdx) return 0;
+function splitAudioClipAtFrame(clipId, frame){
+  const idx = S.audioClips.findIndex(c=>c.id===clipId);
+  if(idx<0) return;
+  const clip = S.audioClips[idx];
+  const rel = frame - clip.startFrame;
+  if(rel<=0 || rel>=clipDurationFrames(clip)) return;
 
-  const span = endIdx - startIdx;
-  const maxSamplesToCheck = 300;
-  const step = Math.max(1, Math.floor(span/maxSamplesToCheck));
+  const cutSec = clip.trimStart + rel/S.fps;
+  const left = { ...clip, id: uid(), trimEnd: cutSec, _buffer: clip._buffer };
+  const right = { ...clip, id: uid(), trimStart: cutSec, startFrame: frame, _buffer: clip._buffer };
+  refreshClipFrames(left);
+  refreshClipFrames(right);
 
-  let sumSq = 0, count = 0;
-  for(let i=startIdx; i<endIdx; i+=step){
-    const v = S.audio.samples[i];
-    sumSq += v*v;
-    count++;
+  S.audioClips = [...S.audioClips.slice(0,idx), left, right, ...S.audioClips.slice(idx+1)];
+  S.selectedAudioClipId = right.id;
+  S.audioSplitFrame = null;
+  focusAudio();
+  stopAudioPlayback();
+  renderAll();
+  saveAudioClips(true);
+
+}
+
+/* ---- Playback: প্রতিটা ক্লিপ নিজের startFrame + trim অনুযায়ী শিডিউল হয় ---- */
+function stopAudioPlayback(){
+  activeAudioSources.forEach(src => { try{ src.stop(); }catch(e){} });
+  activeAudioSources = [];
+}
+
+function startAudioPlaybackFromFrame(frame){
+  stopAudioPlayback();
+  if(!S.audioClips.length) return;
+  const ctx = ensureAudioCtx();
+  if(!ctx) return;
+
+  const playSec = frame / S.fps;
+  const now = ctx.currentTime + 0.05;
+
+  S.audioClips.forEach(clip => {
+    const buffer = makeAudioBuffer(clip);
+    if(!buffer) return;
+    const clipStartSec = clip.startFrame / S.fps;
+    const dur = clipDurationSec(clip);
+    const clipEndSec = clipStartSec + dur;
+    if(clipEndSec <= playSec) return;
+
+    const into = Math.max(0, playSec - clipStartSec);
+    const when = now + Math.max(0, clipStartSec - playSec);
+    const offset = clip.trimStart + into;
+    const playDur = dur - into;
+    if(playDur <= 0) return;
+
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.value = Number.isFinite(clip.volume) ? clip.volume : 1;
+    src.connect(gain).connect(ctx.destination);
+    try{ src.start(when, offset, playDur); }catch(e){ return; }
+    src.onended = () => { activeAudioSources = activeAudioSources.filter(s=>s!==src); };
+    activeAudioSources.push(src);
+  });
+}
+
+/* ---- Export helper: সব ক্লিপ একটা mono buffer-এ মিক্স করা ---- */
+function mixdownAudio(totalFrames){
+  if(!S.audioClips.length) return null;
+  const sampleRate = S.audioClips[0].sampleRate || 48000;
+  const totalSec = totalFrames / S.fps;
+  const outLen = Math.max(1, Math.ceil(totalSec*sampleRate));
+  const out = new Float32Array(outLen);
+
+  S.audioClips.forEach(clip => {
+    const sr = clip.sampleRate || sampleRate;
+    const ratio = sr / sampleRate;
+    const startIdx = Math.round((clip.startFrame/S.fps)*sampleRate);
+    const dur = clipDurationSec(clip);
+    const count = Math.round(dur*sampleRate);
+    const vol = Number.isFinite(clip.volume) ? clip.volume : 1;
+    for(let i=0; i<count; i++){
+      const oi = startIdx + i;
+      if(oi<0) continue;
+      if(oi>=outLen) break;
+      const srcPos = (clip.trimStart*sr) + i*ratio;
+      const i0 = Math.floor(srcPos);
+      if(i0<0 || i0>=clip.samples.length) continue;
+      const i1 = Math.min(clip.samples.length-1, i0+1);
+      const frac = srcPos - i0;
+      const v = clip.samples[i0]*(1-frac) + clip.samples[i1]*frac;
+      out[oi] += v*vol;
+    }
+  });
+
+  for(let i=0;i<outLen;i++){
+    if(out[i]>1) out[i]=1; else if(out[i]<-1) out[i]=-1;
   }
-  return count ? Math.sqrt(sumSq/count) : 0;
+  return { samples: out, sampleRate };
 }
 
 function syncAudioToFrame(){
-  if(!S.audio) return;
-  const audioEl = document.getElementById("audioEl");
-  if(S.playing) return;
-  const t = S.frame / S.fps;
-  if(Math.abs(audioEl.currentTime - t) > 0.03){
-    try{ audioEl.currentTime = Math.min(t, audioEl.duration || t); }catch(e){}
-  }
+  if(!S.playing) stopAudioPlayback();
 }
 
 function setActiveLayer(li){
@@ -1559,6 +2172,7 @@ function setActiveLayer(li){
 function addLayer(){
   const prevLen = S.layers.length;
   commit(ls => [...ls, emptyLayer(`Layer ${ls.length+1}`, frameCount())]);
+  focusLayer();
   setActiveLayer(prevLen);
   renderAll();
 }
@@ -1666,8 +2280,9 @@ async function exportVideoMp4WebCodecs(scale){
   const ctx = off.getContext("2d");
   if(!ctx) return false;
 
-  const samples = (S.audio && S.audio.samples && S.audio.samples.length) ? S.audio.samples : null;
-  const sampleRate = samples ? (S.audio.sampleRate || 48000) : 48000;
+  const mixed = mixdownAudio(frameCount());
+  const samples = mixed ? mixed.samples : null;
+  const sampleRate = mixed ? mixed.sampleRate : 48000;
 
   let audioOk = false;
   if(samples && typeof AudioEncoder !== "undefined"){
@@ -1708,8 +2323,7 @@ async function exportVideoMp4WebCodecs(scale){
   S.playing = false;
   stopPlayback();
   renderPlayButton();
-  const previewAudioEl = document.getElementById("audioEl");
-  if(previewAudioEl) previewAudioEl.pause();
+  stopAudioPlayback();
 
   try{
     const total = frameCount();
@@ -1784,12 +2398,13 @@ async function exportVideoRecorder(scale){
   let exportAudioSource = null;
   let combinedStream = videoStream;
 
-  if(S.audio && S.audio.samples && S.audio.samples.length){
+  const mixedRec = mixdownAudio(frameCount());
+  if(mixedRec && mixedRec.samples.length){
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if(AudioCtx){
       exportAudioCtx = new AudioCtx();
-      const buffer = exportAudioCtx.createBuffer(1, S.audio.samples.length, S.audio.sampleRate);
-      buffer.copyToChannel(S.audio.samples, 0);
+      const buffer = exportAudioCtx.createBuffer(1, mixedRec.samples.length, mixedRec.sampleRate);
+      buffer.copyToChannel(mixedRec.samples, 0);
 
       exportAudioSource = exportAudioCtx.createBufferSource();
       exportAudioSource.buffer = buffer;
@@ -1833,8 +2448,7 @@ async function exportVideoRecorder(scale){
   S.playing = false;
   stopPlayback();
   renderPlayButton();
-  const previewAudioEl = document.getElementById("audioEl");
-  if(previewAudioEl) previewAudioEl.pause();
+  stopAudioPlayback();
 
   if(exportAudioSource){
     try{ exportAudioSource.start(0); }catch(e){}
@@ -1948,6 +2562,49 @@ const el = (tag, cls, html) => {
   return e;
 };
 
+function makeRangeScrollSafe(rangeEl){
+  let startX = 0, startY = 0, startValue = 0, state = "idle"; // idle | undecided | horizontal | vertical
+  function reset(){
+    state = "idle";
+    rangeEl.style.pointerEvents = "";
+  }
+  rangeEl.addEventListener("touchstart", (e) => {
+    if(e.touches.length !== 1){ reset(); return; }
+    state = "undecided";
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startValue = Number(rangeEl.value);
+  }, { passive: true });
+  rangeEl.addEventListener("touchmove", (e) => {
+    if(state === "idle" || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if(state === "undecided"){
+      if(Math.abs(dy) > 5 && Math.abs(dy) >= Math.abs(dx)){
+        state = "vertical";
+        // hand the gesture back to the scroll container
+        rangeEl.style.pointerEvents = "none";
+      } else if(Math.abs(dx) > 5){
+        state = "horizontal";
+      }
+    }
+    if(state !== "horizontal" && Number(rangeEl.value) !== startValue){
+      rangeEl.value = String(startValue);
+      rangeEl.dispatchEvent(new Event("input", { bubbles:true }));
+    }
+  }, { passive: true });
+  rangeEl.addEventListener("touchend", () => {
+    if(state !== "horizontal" && Number(rangeEl.value) !== startValue){
+      rangeEl.value = String(startValue);
+      rangeEl.dispatchEvent(new Event("input", { bubbles:true }));
+    }
+    reset();
+  });
+  rangeEl.addEventListener("touchcancel", reset);
+  document.addEventListener("touchend", () => { if(state !== "idle") reset(); }, { passive: true });
+  document.addEventListener("touchcancel", () => { if(state !== "idle") reset(); }, { passive: true });
+}
+
 function attachStepper(rangeEl){
   const min = rangeEl.min !== "" ? Number(rangeEl.min) : -Infinity;
   const max = rangeEl.max !== "" ? Number(rangeEl.max) : Infinity;
@@ -1993,6 +2650,7 @@ function attachStepper(rangeEl){
   row.appendChild(minusBtn);
   row.appendChild(numInput);
   row.appendChild(plusBtn);
+  makeRangeScrollSafe(rangeEl);
   return row;
 }
 
@@ -2139,21 +2797,25 @@ function updateTimelineActive(){
     const f = Number(c.dataset.frame);
     const li = Number(c.dataset.layer);
     c.classList.toggle("current-frame", f===S.frame);
-    c.classList.toggle("active-cell", f===S.frame && li===S.activeLayer);
+    c.classList.toggle("active-cell", f===S.frame && li===S.activeLayer && S.focus !== 'audio');
   });
 
   table.querySelectorAll(".xsheet-rowhead").forEach(rh => {
-    rh.classList.toggle("active", Number(rh.dataset.layer)===S.activeLayer);
+    rh.classList.toggle("active", Number(rh.dataset.layer)===S.activeLayer && S.focus !== 'audio');
   });
 
-  table.querySelectorAll(".audio-track-cell").forEach(c => {
-    c.classList.toggle("current-frame", Number(c.dataset.frame)===S.frame);
-  });
+  const ph = table.querySelector(".audio-playhead");
+  if(ph){
+    ph.style.left = (S.frame*36 + 17) + "px";
+    ph.style.display = S.focus === 'audio' ? "" : "none";
+  }
 }
 
 function renderTimeline(){
   const table = document.getElementById("timelineStrip");
   table.innerHTML = "";
+  const xsheetWrap = document.getElementById("xsheetWrap");
+  if(xsheetWrap) xsheetWrap.style.setProperty("--audio-row-h", S.audioClips.length ? "34px" : "0px");
   const fc = frameCount();
 
   const headerRow = el("div", "xsheet-header-row");
@@ -2245,7 +2907,28 @@ function renderTimeline(){
     popupMenu.appendChild(itemBox);
   });
 
-  layerSettingsWrap.appendChild(popupMenu);
+  // Render the popup at the root level so it always sits above sticky timeline/audio UI.
+  // Position it just below the top-fixed area (canvas/tool-rail/transport) so the stage stays visible.
+  const existingPopup = document.querySelector('.layer-popup-menu');
+  if (existingPopup) existingPopup.remove();
+  if (showLayerPopupMenu) {
+    document.body.appendChild(popupMenu);
+    positionLayerPopup(popupMenu);
+  }
+
+  function positionLayerPopup(menu){
+    const topFixed = document.querySelector('.top-fixed');
+    const safeGap = 8;
+    if(topFixed){
+      const rect = topFixed.getBoundingClientRect();
+      menu.style.top = Math.round(rect.bottom + safeGap) + 'px';
+      menu.style.maxHeight = Math.round(window.innerHeight - rect.bottom - safeGap * 2) + 'px';
+    } else {
+      menu.style.top = '40vh';
+      menu.style.maxHeight = '58vh';
+    }
+  }
+
   corner.appendChild(layerSettingsWrap);
 
   headerRow.appendChild(corner);
@@ -2258,13 +2941,15 @@ function renderTimeline(){
     colHeads.appendChild(h);
   }
   headerRow.appendChild(colHeads);
+  if(S.audioClips.length > 0) table.appendChild(buildAudioTrackRow(fc));
   table.appendChild(headerRow);
+
 
   for(let li=S.layers.length-1; li>=0; li--){
     const l = S.layers[li];
     const row = el("div", "xsheet-row");
 
-    const rowhead = el("div", `xsheet-rowhead${li===S.activeLayer ? " active" : ""}`);
+    const rowhead = el("div", `xsheet-rowhead${li===S.activeLayer && S.focus !== 'audio' ? " active" : ""}`);
     rowhead.dataset.layer = String(li);
 
     const visBtn = el("button", "visbtn", l.visible ? "👁" : "🚫");
@@ -2272,7 +2957,7 @@ function renderTimeline(){
     rowhead.appendChild(visBtn);
 
     const nameBtn = el("button", "lname", l.name);
-    nameBtn.onclick = () => { setActiveLayer(li); renderAll(); };
+    nameBtn.onclick = () => { focusLayer(); setActiveLayer(li); renderAll(); };
     rowhead.appendChild(nameBtn);
     row.appendChild(rowhead);
 
@@ -2293,7 +2978,7 @@ function renderTimeline(){
       const cls = ["xsheet-cell"];
 
       if(isCurrentCol) cls.push("current-frame");
-      if(isActiveCell) cls.push("active-cell");
+      if(isActiveCell && S.focus !== 'audio') cls.push("active-cell");
 
       const cell = el("div", cls.join(" "));
       cell.dataset.frame = String(f);
@@ -2309,6 +2994,7 @@ function renderTimeline(){
       }
 
       cell.onclick = () => {
+        focusLayer();
         setActiveLayer(li);
         S.frame = f;
         const hits = kfFramesByCell.get(f);
@@ -2334,42 +3020,255 @@ function renderTimeline(){
     row.appendChild(cellsWrap);
     table.appendChild(row);
   }
+}
 
+const CELL_W = 36;
+const AUDIO_LANE_H = 64;
+
+function drawClipWaveform(canvas, clip, widthPx){
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const h = AUDIO_LANE_H - 10;
+  const w = Math.max(1, Math.round(widthPx));
+  canvas.width = Math.round(w*dpr);
+  canvas.height = Math.round(h*dpr);
+  const cx = canvas.getContext("2d");
+  if(!cx) return;
+  cx.scale(dpr, dpr);
+  cx.clearRect(0,0,w,h);
+
+  const sr = clip.sampleRate || 48000;
+  const startIdx = Math.max(0, Math.floor(clip.trimStart*sr));
+  const endIdx = Math.min(clip.samples.length, Math.ceil(clip.trimEnd*sr));
+  const span = endIdx - startIdx;
+  if(span <= 0) return;
+
+  const mid = h/2;
+  cx.strokeStyle = "rgba(255,225,200,.35)";
+  cx.beginPath(); cx.moveTo(0, mid); cx.lineTo(w, mid); cx.stroke();
+
+  cx.fillStyle = "#ffb066";
+  const perCol = span / w;
+  for(let x=0; x<w; x++){
+    const a = startIdx + Math.floor(x*perCol);
+    const b = Math.min(endIdx, startIdx + Math.floor((x+1)*perCol));
+    let peak = 0;
+    const step = Math.max(1, Math.floor((b-a)/48));
+    for(let i=a; i<b; i+=step){
+      const v = Math.abs(clip.samples[i]);
+      if(v>peak) peak = v;
+    }
+    const hh = Math.max(1, peak*(h/2 - 2));
+    cx.fillRect(x, mid-hh, 1, hh*2);
+  }
+}
+
+function clampClipStart(clip, wanted){
+  let minF = 0;
+  let maxF = Infinity;
+  const dur = clipDurationFrames(clip);
+  S.audioClips.forEach(o => {
+    if(o.id===clip.id) return;
+    const oStart = o.startFrame, oEnd = clipEndFrame(o);
+    if(oEnd <= clip.startFrame) minF = Math.max(minF, oEnd);
+    else if(oStart >= clipEndFrame(clip)) maxF = Math.min(maxF, oStart - dur);
+  });
+  return Math.max(minF, Math.min(maxF, Math.max(0, wanted)));
+}
+
+function buildAudioTrackRow(fc){
   const audioRow = el("div", "audio-track-row");
 
-  const audioRowhead = el("div", "audio-track-rowhead");
-  audioRowhead.appendChild(el("span", null, "🔊"));
-  audioRowhead.appendChild(el("span", "lname", S.audio ? S.audio.fileName : "কোনো অডিও নেই"));
-  if(S.audio){
-    const removeBtn = el("button", "visbtn", "✕");
-    removeBtn.title = "অডিও সরাও";
-    removeBtn.onclick = e => { e.stopPropagation(); removeAudio(); };
-    audioRowhead.appendChild(removeBtn);
-  }
-  audioRow.appendChild(audioRowhead);
+  const head = el("div", "audio-track-rowhead");
+  head.appendChild(el("span", null, "🔊"));
+  const sel = selectedAudioClip();
+  head.appendChild(el("span", "lname", sel ? sel.fileName : (S.audioClips.length ? `${S.audioClips.length} clip` : "কোনো অডিও নেই")));
 
-  if(S.audio){
-    const audioCells = el("div", "audio-track-cells");
-    for(let f=0; f<fc; f++){
-      const amp = audioAmplitudeForFrame(f);
-      const hasVoice = amp > AUDIO_VOICE_THRESHOLD;
-      const norm = Math.min(1, amp/0.18);
-      const cell = el("div", `audio-track-cell${f===S.frame ? " current-frame" : ""}`);
-      cell.dataset.frame = String(f);
-      cell.title = hasVoice ? "ভয়েস আছে" : "নিরব";
-      const bar = el("div", `audio-track-bar${hasVoice ? " has-voice" : ""}`);
-      bar.style.height = Math.max(3, Math.round(norm*32)) + "px";
-      cell.appendChild(bar);
-      cell.onclick = () => { S.frame = f; renderAll(); };
-      audioCells.appendChild(cell);
+  const addBtn = el("button", "visbtn", "+");
+  addBtn.title = "অডিও যোগ করো";
+  addBtn.onclick = e => { e.stopPropagation(); document.getElementById("audioInput").click(); };
+  head.appendChild(addBtn);
+
+
+  const delBtn = el("button", "visbtn", "✕");
+  delBtn.title = "সিলেক্টেড ক্লিপ মুছো";
+  delBtn.disabled = !sel;
+  delBtn.style.opacity = sel ? "1" : ".4";
+  delBtn.onclick = e => {
+    e.stopPropagation();
+    if(S.selectedAudioClipId) removeAudioClip(S.selectedAudioClipId);
+  };
+  head.appendChild(delBtn);
+
+  audioRow.appendChild(head);
+
+  const lane = el("div", "audio-track-lane");
+  lane.style.width = (fc*CELL_W) + "px";
+  lane.onpointerdown = e => {
+    if(e.target === lane){
+      e.stopPropagation();
+      S.focus = 'audio';
+      S.selectedAudioClipId = null;
+      S.audioSplitFrame = null;
+      renderTimeline();
     }
-    audioRow.appendChild(audioCells);
-  } else {
-    const hint = el("div", "audio-empty-hint", "হেডারে \u201c+ Audio\u201d চেপে ভয়েস/মিউজিক যোগ করো");
-    audioRow.appendChild(hint);
+  };
+
+
+
+  S.audioClips.forEach(clip => {
+    refreshClipFrames(clip);
+    const durF = clipDurationFrames(clip);
+    const widthPx = durF*CELL_W;
+    const isSel = clip.id === S.selectedAudioClipId;
+    const box = el("div", `audio-clip${isSel ? " selected" : ""}`);
+    box.style.left = (clip.startFrame*CELL_W) + "px";
+    box.style.width = widthPx + "px";
+    box.dataset.clip = clip.id;
+
+    const cv = document.createElement("canvas");
+    box.appendChild(cv);
+    drawClipWaveform(cv, clip, widthPx);
+
+    box.appendChild(el("div", "clip-name", clip.fileName));
+
+    const beginDrag = (e) => {
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+      e.preventDefault();
+      if(S.selectedAudioClipId !== clip.id){
+        focusAudio();
+        S.selectedAudioClipId = clip.id;
+        S.audioSplitFrame = null;
+        // remove selected style from any other clip so only one is highlighted
+        lane.querySelectorAll('.audio-clip.selected').forEach(el => el.classList.remove('selected'));
+        box.classList.add("selected");
+        updateTimelineActive();
+      } else {
+        focusAudio();
+      }
+      stopAudioPlayback();
+      // tap position on the waveform -> snap playhead to nearest frame
+      const laneRect = lane.getBoundingClientRect();
+      let tapFrame = Math.round((e.clientX - laneRect.left)/CELL_W);
+      tapFrame = Math.max(0, Math.min(frameCount()-1, tapFrame));
+      S.frame = tapFrame;
+      const startX = e.clientX;
+      const origStart = clip.startFrame;
+      const frameAtDown = S.frame;
+      const activeLayerAtDown = S.activeLayer;
+      let moved = false;
+      try{ box.setPointerCapture(e.pointerId); }catch(err){}
+
+
+      const onMove = ev => {
+        ev.preventDefault();
+        const dFrames = Math.round((ev.clientX - startX)/CELL_W);
+        const next = clampClipStart(clip, origStart + dFrames);
+        if(next !== clip.startFrame){
+          moved = true;
+          clip.startFrame = next;
+          refreshClipFrames(clip);
+          // move only this clip's DOM node — no timeline re-render, so the
+          // Layer grid's current frame / active cell stay untouched
+          box.style.left = (clip.startFrame*CELL_W) + "px";
+        }
+      };
+      const onUp = ev => {
+        window.removeEventListener("pointermove", onMove, true);
+        window.removeEventListener("pointerup", onUp, true);
+        window.removeEventListener("pointercancel", onUp, true);
+        if(ev){ ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); }
+        // swallow the synthetic click that follows the drag so it can never
+        // reach an xsheet cell underneath
+        const swallow = ce => { ce.stopPropagation(); ce.preventDefault(); };
+        window.addEventListener("click", swallow, true);
+        setTimeout(() => window.removeEventListener("click", swallow, true), 0);
+        // audio drag must never change the playhead / active layer
+        S.frame = frameAtDown;
+        S.activeLayer = activeLayerAtDown;
+        const need = clipEndFrame(clip);
+        if(need > frameCount()) ensureFrameCount(need);
+        renderAll();
+        saveAudioClips(true);
+
+      };
+      window.addEventListener("pointermove", onMove, true);
+      window.addEventListener("pointerup", onUp, true);
+      window.addEventListener("pointercancel", onUp, true);
+    };
+
+
+    box.onpointerdown = beginDrag;
+
+    lane.appendChild(box);
+
+  });
+
+  if(sel){
+    const durF = clipDurationFrames(sel);
+    const canSplit = S.frame > sel.startFrame && S.frame < sel.startFrame + durF;
+    if(canSplit){
+      const btn = el("button", "audio-split-btn", "✂");
+      btn.title = "প্লেহেডে ক্লিপ ভাগ করো";
+      btn.style.left = (S.frame*CELL_W) + "px";
+      btn.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); };
+      btn.onclick = e => {
+        e.stopPropagation();
+        splitAudioClipAtFrame(sel.id, S.frame);
+      };
+      lane.appendChild(btn);
+    }
   }
 
-  table.appendChild(audioRow);
+
+  if(!S.audioClips.length || S.focus !== 'audio'){ audioRow.appendChild(lane); return audioRow; }
+
+  const playhead = el("div", "audio-playhead");
+  playhead.style.left = (S.frame*CELL_W + 17) + "px";
+  const phGrip = el("div", "ph-grip");
+  const phKnob = el("div", "ph-knob");
+  playhead.appendChild(phGrip);
+  playhead.appendChild(phKnob);
+  phGrip.onpointerdown = e => {
+    e.stopPropagation();
+    e.preventDefault();
+    stopAudioPlayback();
+    playhead.classList.add("dragging");
+    try{ phGrip.setPointerCapture(e.pointerId); }catch(err){}
+    const laneRect = lane.getBoundingClientRect();
+    const total = frameCount();
+    const apply = (ev, scrub) => {
+      const x = ev.clientX - laneRect.left;
+      const f = Math.max(0, Math.min(total-1, Math.round((x - 17)/CELL_W)));
+      if(f !== S.frame){
+        S.frame = f;
+        playhead.style.left = (f*CELL_W + 17) + "px";
+        updateFrameCounter();
+        updateTimelineActive();
+        paint();
+        if(scrub) scrubAudioAtFrame(f, false);
+      }
+    };
+    apply(e, false);
+    scrubLastFrame = S.frame;
+    const onMove = ev => apply(ev, true);
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      playhead.classList.remove("dragging");
+      endAudioScrub();
+      renderAll();
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+  lane.appendChild(playhead);
+
+  audioRow.appendChild(lane);
+  return audioRow;
 }
 
 function buildDrawPanelContents(){
@@ -2415,6 +3314,11 @@ function buildDrawPanelContents(){
 }
 
 function renderAllObjectsPanel(){
+  // বর্তমান প্রজেক্টের layer-এ নেই এমন leftover object থাকলে ছেঁটে ফেলা হয়
+  const validLayerIds = new Set(S.layers.map(l=>l.id));
+  if(S.imageObjects.some(o=>!validLayerIds.has(o.layerId))){
+    S.imageObjects = S.imageObjects.filter(o=>validLayerIds.has(o.layerId));
+  }
   if(S.imageObjects.length===0) return null;
 
   const panel = el("div", "panel");
@@ -2435,6 +3339,7 @@ function renderAllObjectsPanel(){
     const btn = el("button", `chip compact-btn${isSel ? " chip-accent" : ""}`, label);
     btn.style.flex = "1";
     btn.onclick = () => {
+      focusLayer();
       S.selectedObjectId = o.id;
       const li = S.layers.findIndex(l=>l.id===o.layerId);
       if(li>=0) S.activeLayer = li;
@@ -2561,6 +3466,7 @@ function renderObjectPanel(){
   const root = document.getElementById("panelContent");
   root.innerHTML = "";
   if(S.tool !== "select") return;
+  if(S.imageObjects.length === 0) return;
 
   const panel = el("div", "panel");
   const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
@@ -2809,12 +3715,13 @@ function renderObjectPanel(){
     const newW = Math.max(0.02, Number(e.target.value)/100);
     const ratio = newW/kf.w;
     const newH = Math.max(0.02, kf.h*ratio);
-    const cx = kf.x + kf.w/2;
-    const cy = kf.y + kf.h/2;
+    const pv = pivotOf(obj);
+    const anchorX = kf.x + pv.px*kf.w;
+    const anchorY = kf.y + pv.py*kf.h;
     kf.w = newW;
     kf.h = newH;
-    kf.x = cx - newW/2;
-    kf.y = cy - newH/2;
+    kf.x = anchorX - pv.px*newW;
+    kf.y = anchorY - pv.py*newH;
     sizeLabel.textContent = `SIZE (জুম) ${e.target.value}%`;
     autosave();
     paint();
@@ -2822,6 +3729,22 @@ function renderObjectPanel(){
   sizeField.appendChild(sizeRange);
   sizeField.appendChild(attachStepper(sizeRange));
   panel.appendChild(sizeField);
+
+  const pivotField = el("div", "field");
+  const curPv = pivotOf(obj);
+  pivotField.appendChild(el("div", "label",
+    `PIVOT (অ্যাংকর) ${Math.round(curPv.px*100)}% / ${Math.round(curPv.py*100)}% — ক্যানভাসে ডট টেনে সরান`));
+  const pivotReset = el("button", "chip w-full", "PIVOT সেন্টারে রিসেট");
+  pivotReset.onclick = () => {
+    const startKfs = obj.keyframes.map(k=>({ ...k }));
+    applyPivotChange(obj, startKfs, pivotOf(obj), { px:0.5, py:0.5 });
+    autosave();
+    renderObjectPanel();
+    paint();
+  };
+  pivotField.appendChild(pivotReset);
+  panel.appendChild(pivotField);
+
 
   const posXField = el("div", "field");
   const curPosXPct = Math.round((curT.x+curT.w/2)*100);
@@ -2899,6 +3822,7 @@ function renderAll(){
   renderObjectPanel();
   syncAudioToFrame();
   paint();
+  if(!S.playing && !exportState.active) autosave();
 }
 
 document.getElementById("btnUndo").onclick = undo;
@@ -2909,16 +3833,12 @@ document.getElementById("btnNext").onclick = () => { S.frame = Math.min(frameCou
 
 document.getElementById("btnPlay").onclick = () => {
   S.playing = !S.playing;
-  const audioEl = document.getElementById("audioEl");
   if(S.playing){
     startPlayback();
-    if(S.audio){
-      try{ audioEl.currentTime = S.frame/S.fps; }catch(e){}
-      audioEl.play().catch(()=>{});
-    }
+    startAudioPlaybackFromFrame(S.frame);
   } else {
     stopPlayback();
-    if(S.audio) audioEl.pause();
+    stopAudioPlayback();
   }
   renderAll();
 };
@@ -3042,14 +3962,434 @@ document.getElementById("shapeInput").addEventListener("change", e => {
   e.target.value = "";
 });
 
+
+/* ================= Project Gallery (IndexedDB) ================= */
+const PROJ_DB_NAME = "frameo-studio-projects";
+const PROJ_STORE = "projects";
+let projDbPromise = null;
+function openProjDb(){
+  if(projDbPromise) return projDbPromise;
+  projDbPromise = new Promise((resolve, reject)=>{
+    try{
+      const req = indexedDB.open(PROJ_DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(PROJ_STORE)) db.createObjectStore(PROJ_STORE, { keyPath: "id" });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }catch(e){ reject(e); }
+  }).catch(()=>null);
+  return projDbPromise;
+}
+function projTx(mode){
+  return openProjDb().then(db => db ? db.transaction(PROJ_STORE, mode).objectStore(PROJ_STORE) : null);
+}
+function idbReq(req){
+  return new Promise(resolve=>{
+    if(!req) return resolve(null);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+/* ---- Local (IndexedDB) store ---- */
+async function localListProjects(){
+  const store = await projTx("readonly");
+  if(!store) return [];
+  const rows = await idbReq(store.getAll());
+  return (rows||[]).sort((a,b)=> (b.updatedAt||0) - (a.updatedAt||0));
+}
+async function localGetProject(id){
+  const store = await projTx("readonly");
+  if(!store) return null;
+  return await idbReq(store.get(id));
+}
+async function localPutProject(rec){
+  const store = await projTx("readwrite");
+  if(!store) return false;
+  await idbReq(store.put(rec));
+  return true;
+}
+async function localDeleteProject(id){
+  const store = await projTx("readwrite");
+  if(!store) return;
+  await idbReq(store.delete(id));
+}
+
+async function listProjects(){
+  return await localListProjects();
+}
+async function getProject(id){
+  return await localGetProject(id);
+}
+async function putProject(rec){
+  return await localPutProject(rec);
+}
+async function deleteProject(id){
+  await localDeleteProject(id);
+}
+async function renameProject(rec, name){
+  const full = await localGetProject(rec.id);
+  if(full) await localPutProject({ ...full, name, updatedAt: Date.now() });
+}
+
+
+async function duplicateProject(id){
+  const base = await getProject(id);
+  if(!base) return;
+  const copyId = uid() + Date.now().toString(36);
+  const copy = {
+    ...base,
+    id: copyId,
+    name: base.name + " (Copy)",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    layers: JSON.parse(JSON.stringify(base.layers)),
+    imageObjects: JSON.parse(JSON.stringify(base.imageObjects)),
+    audioClips: (base.audioClips || []).map(c => ({
+      id: c.id,
+      fileName: c.fileName,
+      samples: c.samples instanceof Float32Array ? new Float32Array(c.samples) : new Float32Array(c.samples || []),
+      sampleRate: c.sampleRate,
+      fileDuration: c.fileDuration,
+      startFrame: c.startFrame,
+      trimStart: c.trimStart,
+      trimEnd: c.trimEnd,
+      volume: c.volume
+    }))
+  };
+  await putProject(copy);
+  return copy;
+}
+
+function makeThumbnail(){
+  try{
+    const off = document.createElement("canvas");
+    const W = 320, H = Math.round(320 * STAGE_H / STAGE_W);
+    off.width = W; off.height = H;
+    const c = off.getContext("2d");
+    if(!c) return "";
+    c.scale(W / STAGE_W, H / STAGE_H);
+    renderFrame(c, S.layers, S.imageObjects, 0, STAGE_W, STAGE_H, S.bg);
+    return off.toDataURL("image/jpeg", 0.7);
+  }catch(e){ return ""; }
+}
+
+function serializeAudioClips(){
+  return S.audioClips.map(c => ({
+    id: c.id, fileName: c.fileName,
+    samples: c.samples ? new Float32Array(c.samples) : new Float32Array(0),
+    sampleRate: c.sampleRate,
+    fileDuration: c.fileDuration, startFrame: c.startFrame,
+    trimStart: c.trimStart, trimEnd: c.trimEnd, volume: c.volume
+  }));
+}
+function hydrateAudioClips(rows){
+  S.audioClips = (rows||[]).map(r => {
+    const clip = { ...r, src: null, objectUrl: null, _buffer: null,
+      samples: r.samples instanceof Float32Array ? r.samples : new Float32Array(r.samples || []) };
+    refreshClipFrames(clip);
+    return clip;
+  });
+  lastAudioSignature = null;
+  let need = 0;
+  S.audioClips.forEach(c => { need = Math.max(need, clipEndFrame(c)); });
+  if(need > frameCount()) ensureFrameCount(need);
+}
+
+function buildProjectRecord(id, name, createdAt){
+  return {
+    id, name,
+    thumbnail: makeThumbnail(),
+    layers: JSON.parse(JSON.stringify(S.layers)),
+    imageObjects: JSON.parse(JSON.stringify(S.imageObjects)),
+    audioClips: serializeAudioClips(),
+    fps: S.fps,
+    bg: S.bg,
+    onion: S.onion, onionBefore: S.onionBefore, onionAfter: S.onionAfter,
+    frame: S.frame, activeLayer: S.activeLayer,
+    createdAt: createdAt || Date.now(),
+    updatedAt: Date.now()
+  };
+}
+
+let savingProject = false;
+/* মেটাডেটা (নাম/তারিখ) — cloud-এ ভারী পুরো রেকর্ড ডাউনলোড না করে হালকা লিস্ট থেকে */
+async function getProjectMeta(id){
+  const rows = await listProjects();
+  return (rows || []).find(r => r.id === id) || null;
+}
+async function saveCurrentProject(){
+  if(!S.currentProjectId || savingProject) return false;
+  savingProject = true;
+  try{
+    const existing = await getProjectMeta(S.currentProjectId);
+    if(!existing){ S.currentProjectId = null; return false; }
+    await putProject(buildProjectRecord(existing.id, existing.name, existing.createdAt));
+    return true;
+  }catch(e){ return false; }
+  finally{ savingProject = false; }
+}
+
+function defaultProjectName(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,"0");
+  return `Project ${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+async function saveAsNewProject(){
+  const name = (prompt("প্রজেক্টের নাম দিন:", defaultProjectName()) || "").trim();
+  if(!name) return;
+  const id = uid() + Date.now().toString(36);
+  await putProject(buildProjectRecord(id, name, Date.now()));
+  S.currentProjectId = id;
+  autosaveNow();
+  S.currentView = "files";
+  if(location.hash !== "#files") location.hash = "#files";
+  renderGallery();
+}
+
+async function startNewProject(){
+  if(!confirm("নতুন প্রজেক্ট শুরু করবেন? বর্তমান কাজ সেভ করা না থাকলে হারিয়ে যাবে।")) return;
+  stopPlayback();
+  S.layers = [emptyLayer("Layer 1", 1)];
+  S.imageObjects = [];
+  S.audioClips = [];
+  S.selectedObjectId = null;
+  S.selectedAudioClipId = null;
+  S.activeLayer = 0;
+  S.frame = 0;
+  S.focus = "layer";
+  S.view = { z: 1, x: 0, y: 0 };
+  S.currentProjectId = null;
+  past = []; future = [];
+  lastAudioSignature = null;
+  autosaveNow();
+  closeGallery();
+  renderAll();
+  paint();
+}
+
+let projectLoadVersion = 0;
+async function loadProject(id){
+  const loadVersion = ++projectLoadVersion;
+  const rec = await getProject(id);
+  if(!rec || loadVersion !== projectLoadVersion) return;
+  stopPlayback();
+  // প্রজেক্ট switch সবসময় clean state থেকে শুরু করে; আগের project-এর object বা
+  // selection কোনো async load-এর মাঝেও UI/state-এ বেঁচে থাকতে পারবে না।
+  S.imageObjects = [];
+  S.selectedObjectId = null;
+  const nextLayers = Array.isArray(rec.layers)
+    ? JSON.parse(JSON.stringify(rec.layers))
+    : [];
+  S.layers = nextLayers.length ? nextLayers : [emptyLayer("Layer 1", 1)];
+  // ফ্রেমের ভেতরে পুরনো image-stroke reference থাকলে বাদ
+  S.layers = S.layers.map(l => ({
+    ...l,
+    frames: (l.frames || []).map(f => (f || []).filter(s => s.tool !== "image"))
+  }));
+  const nextImageObjects = Array.isArray(rec.imageObjects)
+    ? JSON.parse(JSON.stringify(rec.imageObjects))
+    : [];
+  // নতুন project-এর snapshot দিয়ে সম্পূর্ণ replacement; append/merge নয়।
+  S.imageObjects = sanitizeImageObjects(nextImageObjects, S.layers);
+  hydrateAudioClips(rec.audioClips);
+  if(Number.isFinite(rec.fps)) S.fps = rec.fps;
+  if(typeof rec.bg === "string") S.bg = rec.bg;
+  if(typeof rec.onion === "boolean") S.onion = rec.onion;
+  if(Number.isFinite(rec.onionBefore)) S.onionBefore = rec.onionBefore;
+  if(Number.isFinite(rec.onionAfter)) S.onionAfter = rec.onionAfter;
+  S.activeLayer = Math.max(0, Math.min(S.layers.length-1, rec.activeLayer || 0));
+  S.frame = Math.max(0, Math.min(frameCount()-1, rec.frame || 0));
+  S.selectedAudioClipId = null;
+  S.focus = "layer";
+  S.currentProjectId = id;
+  past = []; future = [];
+  autosaveNow();
+  closeGallery();
+  renderAll();
+  paint();
+  // সব ছবি decode হওয়ার পর আবার render, যাতে canvas ফাঁকা না দেখায়
+  await preloadImageObjectSources(S.imageObjects);
+  if(loadVersion !== projectLoadVersion) return;
+  renderAll();
+  paint();
+}
+
+
+
+
+const galleryOverlay = document.getElementById("galleryOverlay");
+const galleryGrid = document.getElementById("galleryGrid");
+const galleryEmpty = document.getElementById("galleryEmpty");
+
+function fmtProjDate(ts){
+  if(!ts) return "";
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+let openMenuId = null;
+
+async function renderGallery(){
+  
+  const rows = await listProjects();
+ 
+  const upd = document.getElementById("btnGalleryUpdate");
+  if(upd) upd.classList.toggle("hidden", !rows.some(r => r.id === S.currentProjectId));
+  galleryGrid.innerHTML = "";
+  galleryEmpty.classList.toggle("hidden", rows.length > 0);
+  rows.forEach(rec => {
+    const card = el("div", "proj-card" + (rec.id === S.currentProjectId ? " current" : ""));
+    const img = document.createElement("img");
+    img.className = "proj-thumb";
+    img.alt = rec.name;
+    if(rec.thumbnail) img.src = rec.thumbnail;
+    card.appendChild(img);
+    const meta = el("div", "proj-meta");
+    meta.appendChild(el("div", "proj-name", rec.name));
+    meta.appendChild(el("div", "proj-date", fmtProjDate(rec.updatedAt)));
+    card.appendChild(meta);
+
+    const menuBtn = document.createElement("button");
+    menuBtn.className = "proj-menu-btn";
+    menuBtn.textContent = "⋮";
+    card.appendChild(menuBtn);
+
+    menuBtn.onclick = (e) => {
+      e.stopPropagation();
+      openMenuId = (openMenuId === rec.id ? null : rec.id);
+      renderGallery();
+    };
+
+    if(openMenuId === rec.id){
+      const menu = el("div", "proj-menu");
+      menu.onclick = (ev) => ev.stopPropagation();
+      const ren = document.createElement("button");
+      ren.textContent = "✏️ Rename";
+      ren.onclick = async (ev) => {
+        ev.stopPropagation();
+        openMenuId = null;
+        renderGallery();
+        const nm = (prompt("নতুন নাম:", rec.name) || "").trim();
+        if(!nm) return;
+        await renameProject(rec, nm);
+        renderGallery();
+      };
+      const dup = document.createElement("button");
+      dup.textContent = "📄 Duplicate";
+      dup.onclick = async (ev) => {
+        ev.stopPropagation();
+        openMenuId = null;
+        renderGallery();
+        await duplicateProject(rec.id);
+        renderGallery();
+      };
+      const del = document.createElement("button");
+      del.textContent = "🗑️ Delete";
+      del.onclick = async (ev) => {
+        ev.stopPropagation();
+        openMenuId = null;
+        renderGallery();
+        if(!confirm(`"${rec.name}" মুছে ফেলবেন?`)) return;
+        await deleteProject(rec.id);
+        if(S.currentProjectId === rec.id){ S.currentProjectId = null; autosaveNow(); }
+        renderGallery();
+      };
+      menu.appendChild(ren);
+      menu.appendChild(dup);
+      menu.appendChild(del);
+      card.appendChild(menu);
+    }
+
+    card.onclick = () => {
+      if(openMenuId !== null){
+        openMenuId = null;
+        renderGallery();
+        return;
+      }
+      loadProject(rec.id);
+    };
+    galleryGrid.appendChild(card);
+  });
+}
+
+galleryOverlay.addEventListener('click', (e) => {
+  if(!openMenuId) return;
+  if(e.target.closest('.proj-menu') || e.target.closest('.proj-menu-btn')) return;
+  openMenuId = null;
+  renderGallery();
+});
+
+function openGallery(){
+  galleryOverlay.classList.remove("hidden");
+  S.currentView = "files";
+  if(location.hash !== "#files") location.hash = "#files";
+  autosaveNow();
+  renderGallery();
+}
+function closeGallery(){
+  galleryOverlay.classList.add("hidden");
+  S.currentView = "canvas";
+  if(location.hash === "#files") location.hash = "#canvas";
+  autosaveNow();
+}
+
+/* রিফ্রেশ/Back-Forward-এ সঠিক ভিউ পুনরুদ্ধার */
+function applyCurrentView(){
+  if(S.currentView === "files") openGallery();
+  else closeGallery();
+}
+window.addEventListener("hashchange", () => {
+  const want = location.hash === "#files" ? "files" : "canvas";
+  if(want === S.currentView) return;
+  S.currentView = want;
+  applyCurrentView();
+});
+
+document.getElementById("btnProjects").onclick = () => { autosaveNow(); openGallery(); };
+document.getElementById("btnGalleryClose").onclick = closeGallery;
+document.getElementById("btnGalleryNew").onclick = startNewProject;
+document.getElementById("btnGallerySaveAs").onclick = saveAsNewProject;
+document.getElementById("btnGalleryUpdate").onclick = async () => {
+  if(!S.currentProjectId) return;
+  const rec = await getProjectMeta(S.currentProjectId);
+  if(!rec){ S.currentProjectId = null; renderGallery(); return; }
+  if(!confirm(`"${rec.name}" ফাইলটি বর্তমান কাজ দিয়ে আপডেট করবেন?`)) return;
+  await saveCurrentProject();
+  S.currentView = "files";
+  if(location.hash !== "#files") location.hash = "#files";
+  renderGallery();
+};
+
 tryRestore();
+if(location.hash === "#files") S.currentView = "files";
+else if(location.hash === "#canvas") S.currentView = "canvas";
 renderAll();
+applyCurrentView();
+// রিস্টোরের পর ছবিগুলো decode করে আবার render
+preloadImageObjectSources(S.imageObjects).then(()=>{ renderAll(); paint(); }).catch(()=>{});
+
 requestAnimationFrame(resizeCanvas);
 window.addEventListener("resize", resizeCanvas);
+
+// অডিও ক্লিপ IndexedDB থেকে ফিরিয়ে আনো
+restoreAudioClips().then(ok => {
+  if(!ok) return;
+  if(S.selectedAudioClipId && !S.audioClips.some(c=>c.id===S.selectedAudioClipId)) S.selectedAudioClipId = null;
+  renderAll();
+}).catch(()=>{ audioRestoreDone = true; });
+
+// ট্যাব বন্ধ/লুকানোর আগে সাথে সাথে সেভ
+window.addEventListener("beforeunload", autosaveNow);
+window.addEventListener("pagehide", autosaveNow);
+document.addEventListener("visibilitychange", () => { if(document.hidden) autosaveNow(); });
+
 
 })();
 </script>
 
 </body>
 </html>
- 
