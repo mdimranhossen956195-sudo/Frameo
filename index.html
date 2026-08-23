@@ -172,7 +172,10 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 </head>
 <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
 <body>
-<div id="authOverlay" style="position:fixed;inset:0;z-index:9999;background:#2c2620;display:flex;align-items:center;justify-content:center;padding:1rem;">
+    <div id="loadingOverlay" style="position:fixed;inset:0;z-index:9998;background:#2c2620;display:flex;align-items:center;justify-content:center;">
+  <div style="color:#e6a559;font-family:Arial,sans-serif;font-size:1rem;">লোড হচ্ছে…</div>
+</div>
+<div id="authOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#2c2620;align-items:center;justify-content:center;padding:1rem;">
   <div style="width:100%;max-width:340px;background:#3a3128;border:1px solid #55483a;border-radius:12px;padding:1.5rem;color:#f2ede0;font-family:Arial,sans-serif;">
     <h2 id="authTitle" style="margin:0 0 1rem;text-align:center;">লগইন করুন</h2>
 
@@ -339,12 +342,18 @@ function hideAuthError(){
   document.getElementById("authError").style.display = "none";
 }
 
+function hideLoadingOverlay(){
+  const el = document.getElementById("loadingOverlay");
+  if(el) el.remove();
+}
 function showApp(){
-  document.getElementById("authOverlay").classList.add("hidden");
+  hideLoadingOverlay();
+  document.getElementById("authOverlay").style.display = "none";
   document.getElementById("app").classList.remove("hidden");
 }
 function showAuthScreen(){
-  document.getElementById("authOverlay").classList.remove("hidden");
+  hideLoadingOverlay();
+  document.getElementById("authOverlay").style.display = "flex";
   document.getElementById("app").classList.add("hidden");
 }
 
@@ -2717,7 +2726,7 @@ function renderToolRail(){
 
       const settingsDropdown = el("div", `color-picker-dropdown${showSettingsDropdown ? "" : " hidden"}`);
       settingsDropdown.style.width = "210px";
-      settingsDropdown.appendChild(buildDrawPanelContents());
+  settingsDropdown.onclick = (e) => e.stopPropagation();    settingsDropdown.appendChild(buildDrawPanelContents());
       settingsWrap.appendChild(settingsDropdown);
       rail.appendChild(settingsWrap);
     }
@@ -2844,69 +2853,69 @@ function renderTimeline(){
 
   popupMenu.appendChild(el("div", "label", "All Layers List"));
 
-  S.layers.forEach((l, li) => {
-    const itemBox = el("div", "layer-item-box");
+  for(let li=S.layers.length-1; li>=0; li--){
+  const l = S.layers[li];
+  const itemBox = el("div", "layer-item-box");
 
-    const row1 = el("div", "layer-item-row");
-    const nameInput = el("input");
-    nameInput.type = "text";
-    nameInput.value = l.name;
-    nameInput.style.flex = "1";
-    nameInput.style.padding = "3px 5px";
-    nameInput.style.background = "var(--card)";
-    nameInput.style.color = "var(--foreground)";
-    nameInput.style.border = "1px solid var(--border)";
-    nameInput.style.borderRadius = "4px";
-    nameInput.style.fontSize = "0.7rem";
-    nameInput.oninput = (e) => { l.name = e.target.value; autosave(); };
-    row1.appendChild(nameInput);
+  const row1 = el("div", "layer-item-row");
+  const nameInput = el("input");
+  nameInput.type = "text";
+  nameInput.value = l.name;
+  nameInput.style.flex = "1";
+  nameInput.style.padding = "3px 5px";
+  nameInput.style.background = "var(--card)";
+  nameInput.style.color = "var(--foreground)";
+  nameInput.style.border = "1px solid var(--border)";
+  nameInput.style.borderRadius = "4px";
+  nameInput.style.fontSize = "0.7rem";
+  nameInput.oninput = (e) => { l.name = e.target.value; autosave(); };
+  row1.appendChild(nameInput);
 
-    const upBtn = el("button", "chip compact-btn", "↑");
-    upBtn.onclick = () => { moveLayer(li, -1); renderTimeline(); };
-    row1.appendChild(upBtn);
+  const upBtn = el("button", "chip compact-btn", "↑");
+  upBtn.onclick = () => { moveLayer(li, -1); renderTimeline(); };
+  row1.appendChild(upBtn);
 
-    const downBtn = el("button", "chip compact-btn", "↓");
-    downBtn.onclick = () => { moveLayer(li, 1); renderTimeline(); };
-    row1.appendChild(downBtn);
+  const downBtn = el("button", "chip compact-btn", "↓");
+  downBtn.onclick = () => { moveLayer(li, 1); renderTimeline(); };
+  row1.appendChild(downBtn);
 
-    const delBtn = el("button", "chip compact-btn chip-danger", "✕");
-    delBtn.onclick = () => { removeLayer(li); renderTimeline(); };
-    row1.appendChild(delBtn);
+  const delBtn = el("button", "chip compact-btn chip-danger", "✕");
+  delBtn.onclick = () => { removeLayer(li); renderTimeline(); };
+  row1.appendChild(delBtn);
 
-    itemBox.appendChild(row1);
+  itemBox.appendChild(row1);
 
-    const row2 = el("div", "layer-item-row");
-    const opLabel = el("span", "label", `Op: ${Math.round(l.opacity * 100)}%`);
-    opLabel.style.fontSize = "0.55rem";
-    row2.appendChild(opLabel);
+  const row2 = el("div", "layer-item-row");
+  const opLabel = el("span", "label", `Op: ${Math.round(l.opacity * 100)}%`);
+  opLabel.style.fontSize = "0.55rem";
+  row2.appendChild(opLabel);
 
-    const opRange = el("input");
-    opRange.type = "range";
-    opRange.min = 10;
-    opRange.max = 100;
-    opRange.value = Math.round(l.opacity * 100);
-    opRange.style.flex = "1";
-    opRange.oninput = (e) => { setLayerOpacity(li, Number(e.target.value) / 100); opLabel.textContent = `Op: ${e.target.value}%`; };
-    row2.appendChild(opRange);
+  const opRange = el("input");
+  opRange.type = "range";
+  opRange.min = 10;
+  opRange.max = 100;
+  opRange.value = Math.round(l.opacity * 100);
+  opRange.style.flex = "1";
+  opRange.oninput = (e) => { setLayerOpacity(li, Number(e.target.value) / 100); opLabel.textContent = `Op: ${e.target.value}%`; };
+  row2.appendChild(opRange);
 
-    itemBox.appendChild(row2);
-    itemBox.appendChild(attachStepper(opRange));
+  itemBox.appendChild(row2);
+  itemBox.appendChild(attachStepper(opRange));
 
-    const row3 = el("div", "layer-item-row");
-    const flipHBtn = el("button", "chip compact-btn flex-1", "↔ Flip H (Layer)");
-    flipHBtn.title = "এই লেয়ারের সব ফ্রেমের সব ছবি অনুভূমিকভাবে ফ্লিপ হবে";
-    flipHBtn.onclick = () => { flipLayerObjects(li, "x"); };
-    row3.appendChild(flipHBtn);
+  const row3 = el("div", "layer-item-row");
+  const flipHBtn = el("button", "chip compact-btn flex-1", "↔ Flip H (Layer)");
+  flipHBtn.title = "এই লেয়ারের সব ফ্রেমের সব ছবি অনুভূমিকভাবে ফ্লিপ হবে";
+  flipHBtn.onclick = () => { flipLayerObjects(li, "x"); };
+  row3.appendChild(flipHBtn);
 
-    const flipVBtn = el("button", "chip compact-btn flex-1", "↕ Flip V (Layer)");
-    flipVBtn.title = "এই লেয়ারের সব ফ্রেমের সব ছবি উলম্বভাবে ফ্লিপ হবে";
-    flipVBtn.onclick = () => { flipLayerObjects(li, "y"); };
-    row3.appendChild(flipVBtn);
+  const flipVBtn = el("button", "chip compact-btn flex-1", "↕ Flip V (Layer)");
+  flipVBtn.title = "এই লেয়ারের সব ফ্রেমের সব ছবি উলম্বভাবে ফ্লিপ হবে";
+  flipVBtn.onclick = () => { flipLayerObjects(li, "y"); };
+  row3.appendChild(flipVBtn);
 
-    itemBox.appendChild(row3);
-    popupMenu.appendChild(itemBox);
-  });
-
+  itemBox.appendChild(row3);
+  popupMenu.appendChild(itemBox);
+}
   // Render the popup at the root level so it always sits above sticky timeline/audio UI.
   // Position it just below the top-fixed area (canvas/tool-rail/transport) so the stage stays visible.
   const existingPopup = document.querySelector('.layer-popup-menu');
