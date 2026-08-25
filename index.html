@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8" />
@@ -67,10 +67,11 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .quick-shape-thumb{flex:0 0 auto;width:2.6rem;height:2.6rem;padding:2px;}
 .quick-shape-thumb img{width:100%;height:100%;object-fit:contain;border-radius:6px;background:rgba(255,255,255,.85);}
 
-.transport{display:flex;align-items:center;gap:.3rem;padding:.4rem .5rem;flex-wrap:nowrap;justify-content:space-between;}
-.transport-left{display:flex;align-items:center;gap:.25rem;}
-.transport-right{display:flex;align-items:center;gap:.25rem;}
-.frame-counter{font-size:.7rem;color:var(--muted-foreground);white-space:nowrap;margin:0 .2rem;}
+.transport{display:flex;align-items:center;justify-content:space-between;gap:.3rem;padding:.4rem .5rem;flex-wrap:nowrap;width:100%;} 
+.transport-left{display:flex;align-items:center;gap:.25rem;flex-shrink:0;}
+.transport-right{display:flex;align-items:center;gap:.25rem;flex-shrink:0;flex-wrap:nowrap;}
+.transport-panel{padding:.5rem .6rem;}
+.frame-counter{font-size:.7rem;color:var(--muted-foreground);white-space:nowrap;margin:0 .2rem;font-variant-numeric:tabular-nums;min-width:3.6em;display:inline-block;}
 .frame-counter span{color:var(--foreground);}
 
 .timeline-controls{display:flex;align-items:center;gap:.3rem;padding:.4rem .5rem;flex-wrap:wrap;}
@@ -142,6 +143,31 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 
 .export-dropdown{position:absolute;top:100%;right:.5rem;z-index:100;width:240px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem;box-shadow:var(--shadow-panel);}
 .export-dropdown.hidden{display:none;}
+.more-menu{position:absolute;top:calc(100% + 10px);right:0;z-index:100;width:150px;max-width:calc(100vw - 1rem);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.6rem;box-shadow:var(--shadow-panel);}
+.more-menu.hidden{display:none;}
+.more-menu::before{
+  content:"";
+  position:absolute;
+  top:-8px; right:14px;
+  width:16px; height:16px;
+  background:var(--card);
+  border-left:1px solid var(--border);
+  border-top:1px solid var(--border);
+  transform:rotate(45deg);
+}
+#btnMoreMenu.menu-open{
+  border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent);
+}
+.more-menu-header{padding:.2rem .3rem .7rem;border-bottom:1px solid var(--border);margin-bottom:.5rem;}
+.more-menu-item{display:flex;align-items:center;gap:.6rem;width:100%;padding:.6rem .5rem;border-radius:8px;border:none;background:none;color:var(--foreground);font-size:.78rem;text-align:left;margin-bottom:.2rem;}
+.more-menu-item:active{background:var(--secondary);}
+.mmi-icon{font-size:1rem;width:1.4rem;text-align:center;flex:0 0 auto;}
+.mmi-label{flex:1;}
+.mmi-chevron{color:var(--muted-foreground);font-size:.9rem;}
+.more-menu-divider{height:1px;background:var(--border);margin:.4rem 0;}
+.more-menu-danger{color:var(--destructive);}
+.more-menu-danger:active{background:rgba(217,105,79,.15);}
 .export-overlay{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(44,38,32,.85);backdrop-filter:blur(4px);}
 .export-overlay.hidden{display:none;}
 .export-overlay .panel{text-align:center;}
@@ -166,14 +192,24 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 .proj-menu button:hover{background:rgba(255,255,255,.08);}
 .gallery-empty{color:var(--muted-foreground);font-size:.8rem;padding:2rem 0;text-align:center;}
 
-@media(max-width:420px){.icon-btn{width:2rem;height:2rem;font-size:.75rem;}}
+@media(max-width:420px){
+  .icon-btn{width:1.75rem;height:1.75rem;font-size:.68rem;}
+  .transport{gap:.15rem;padding:.3rem .3rem;}
+  .transport-left{gap:.12rem;min-width:0;flex-shrink:1;}
+  .transport-right{gap:.12rem;min-width:0;flex-shrink:1;}
+  .frame-counter{min-width:2.6em;margin:0 .05rem;font-size:.6rem;}
+  .transport .chip{padding:.16rem .22rem !important;font-size:.52rem !important;white-space:nowrap;}
+  .transport #easingTopSelect{padding:.16rem .05rem !important;font-size:.52rem !important;}
+  .panel.transport-panel{padding:.3rem .35rem;}
+}
 
 </style>
 </head>
-<script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script> 
 <body>
-    <div id="loadingOverlay" style="position:fixed;inset:0;z-index:9998;background:#2c2620;display:flex;align-items:center;justify-content:center;">
-  <div style="color:#e6a559;font-family:Arial,sans-serif;font-size:1rem;">লোড হচ্ছে…</div>
+    <div id="loadingOverlay" style="position:fixed;inset:0;z-index:9998;background:#2c2620;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;">
+  <div style="color:#e6a559;font-family:'Arial Narrow',Arial,sans-serif;font-size:2rem;letter-spacing:.05em;">FRAMEO</div>
+  <div style="color:#b8ab97;font-family:Arial,sans-serif;font-size:.85rem;">লোড হচ্ছে…</div>
 </div>
 <div id="authOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#2c2620;align-items:center;justify-content:center;padding:1rem;">
   <div style="width:100%;max-width:340px;background:#3a3128;border:1px solid #55483a;border-radius:12px;padding:1.5rem;color:#f2ede0;font-family:Arial,sans-serif;">
@@ -183,7 +219,10 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
       <input id="authName" type="text" placeholder="নাম" style="width:100%;padding:.6rem;margin-bottom:.6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
     </div>
     <input id="authEmail" type="email" placeholder="ইমেইল" style="width:100%;padding:.6rem;margin-bottom:.6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
-    <input id="authPassword" type="password" placeholder="পাসওয়ার্ড" style="width:100%;padding:.6rem;margin-bottom:.6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
+    <div style="position:relative;margin-bottom:.6rem;">
+  <input id="authPassword" type="password" placeholder="পাসওয়ার্ড" style="width:100%;padding:.6rem 2.4rem .6rem .6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
+  <button type="button" id="togglePassword" style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#b8ab97;font-size:1.1rem;cursor:pointer;padding:.2rem;">👁</button>
+</div>
 
     <div id="authError" style="color:#d9694f;font-size:.75rem;margin-bottom:.6rem;display:none;"></div>
 
@@ -193,7 +232,11 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
       <span id="authToggleText">অ্যাকাউন্ট নেই? </span>
       <a href="#" id="authToggleLink" style="color:#e6a559;">রেজিস্ট্রেশন করুন</a>
     </div>
-  </div>
+    
+  <div style="text-align:center;font-size:.75rem;margin-top:.4rem;">
+  <a href="#" id="forgotPasswordLink" style="color:#e6a559;">পাসওয়ার্ড ভুলে গেছেন?</a>
+</div>
+</div>
 </div>
 <div id="app" class="hidden">
 
@@ -201,19 +244,48 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
   <div class="title-block">
     <h1 class="font-display">FRAMEO </h1>
   </div>
-
+  
   <button id="btnUndo" class="icon-btn">↶</button>
-  <button id="btnRedo" class="icon-btn">↷</button>
-  <button id="btnProjects" class="chip compact-btn">📁 Files</button>
-  <button id="btnImportAudio" class="chip compact-btn">+ Audio</button>
-  <button id="btnImportGallery" class="chip compact-btn">+Gallery</button>
-  <button id="btnExportTab" class="chip chip-accent compact-btn">Export</button>
+<button id="btnRedo" class="icon-btn">↷</button>
+<button id="btnGalleryNew" class="chip chip-accent compact-btn"> New Project</button>
+<button id="btnGallerySaveAs" class="chip compact-btn">Save As</button>
+<button id="btnExportTab" class="chip chip-accent compact-btn">Export</button>
 
-  <div id="exportDropdown" class="export-dropdown hidden">
-    <button id="b4k" class="chip w-full chip-accent" style="margin-bottom:.35rem;">Export MP4 — YouTube 4K</button>
-    <button id="b1080" class="chip w-full" style="margin-bottom:.35rem;">Export MP4 — YouTube 1080p</button>
-    <button id="bpng" class="chip w-full">Export PNG Frame</button>
+
+<div class="tool-item">
+  <button id="btnMoreMenu" class="icon-btn">☰</button>
+  <div id="moreDropdown" class="more-menu hidden">
+    <div class="more-menu-header">
+      <div class="font-display" style="font-size:1.05rem;">FRAMEO</div>
+      <div style="font-size:.62rem;color:var(--muted-foreground);">2D Animation Studio</div>
+    </div>
+
+    <button id="btnProjects" class="more-menu-item">
+      <span class="mmi-icon">📁</span><span class="mmi-label">Files</span><span class="mmi-chevron">›</span>
+    </button>
+    <button id="btnImportAudio" class="more-menu-item">
+      <span class="mmi-icon">🎵</span><span class="mmi-label">Audio</span><span class="mmi-chevron">›</span>
+    </button>
+    <button id="btnImportGallery" class="more-menu-item">
+      <span class="mmi-icon">🖼️</span><span class="mmi-label">photo</span><span class="mmi-chevron">›</span>
+    </button>
+<button id="btnImportVideo" class="more-menu-item">
+      <span class="mmi-icon">🎬</span><span class="mmi-label">Video</span><span class="mmi-chevron">›</span>
+    </button>
+    <div class="more-menu-divider"></div>
+
+    <button id="btnLogout" class="more-menu-item more-menu-danger">
+      <span class="mmi-icon">⎋</span><span class="mmi-label">Logout</span>
+    </button>
   </div>
+</div>
+
+<div id="exportDropdown" class="export-dropdown hidden">
+  <button id="b4k" class="chip w-full chip-accent" style="margin-bottom:.35rem;">Export MP4 — YouTube 4K</button>
+  <button id="b1080" class="chip w-full" style="margin-bottom:.35rem;">Export MP4 — YouTube 1080p</button>
+  <button id="bpng" class="chip w-full">Export PNG Frame</button>
+</div>
+
 </header>
 
 <main>
@@ -226,7 +298,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 
     <div class="tool-rail" id="toolRail"></div>
 
-    <div class="panel" style="display:flex;flex-direction:column;gap:.25rem;padding:.5rem .6rem;">
+    <div class="panel transport-panel" style="display:flex;flex-direction:column;gap:.25rem;">
       <div class="transport">
         <div class="transport-left">
           <button id="btnFirst" class="icon-btn">⏮</button>
@@ -239,7 +311,10 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
         </div>
 
         <div class="transport-right">
-          <div class="tool-item" style="display:inline-flex;">
+          <div class="tool-item" id="easingTopWrap" style="display:none;">
+  <select id="easingTopSelect" class="chip" style="padding: 0.2rem 0.1rem; font-size: 0.6rem; appearance:none; -webkit-appearance:none; -moz-appearance:none; text-align:center; text-align-last:center;"></select>
+</div>
+          <div class="tool-item" style="display:inline-flex;"> 
             <button id="btnFpsToggle" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">FPS: 12</button>
             <div id="fpsDropdown" class="color-picker-dropdown hidden" style="width: 170px;">
               <div class="field" style="margin:0;">
@@ -291,10 +366,6 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 <div id="galleryOverlay" class="gallery-overlay hidden">
   <div class="gallery-top">
     <h2 class="font-display">My Projects</h2>
-    <button id="btnGalleryUpdate" class="chip compact-btn hidden">⬆ Update</button>
-    <button id="btnGallerySaveAs" class="chip compact-btn">💾 Save As</button>
-
-    <button id="btnGalleryNew" class="chip chip-accent compact-btn">+ New Project</button>
     <button id="btnGalleryClose" class="chip compact-btn">✕ Close</button>
   </div>
   
@@ -315,6 +386,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 <input id="photoInput" type="file" accept="image/*" class="hidden" />
 <input id="audioInput" type="file" accept="audio/*" class="hidden" />
 <input id="shapeInput" type="file" accept="image/*" class="hidden" />
+<input id="videoInput" type="file" accept="video/*" class="hidden" />
 <audio id="audioEl" class="hidden" preload="auto"></audio>
 
 <script>
@@ -332,6 +404,7 @@ const awAccount = new Appwrite.Account(awClient);
 /* ================= END APPWRITE AUTH (setup) ================= */
 
 let isRegisterMode = false;
+let currentUserId = null;
 
 function showAuthError(msg){
   const el = document.getElementById("authError");
@@ -359,9 +432,12 @@ function showAuthScreen(){
 
 async function checkSession(){
   try{
-    await awAccount.get();
+    const user = await awAccount.get();
+    currentUserId = user.$id;
+    await onUserReady();
     showApp();
   }catch(e){
+    currentUserId = null;
     showAuthScreen();
   }
 }
@@ -393,13 +469,86 @@ document.getElementById("authSubmitBtn").onclick = async () => {
     } else {
       await awAccount.createEmailPasswordSession(email, password);
     }
+    const user = await awAccount.get();
+    currentUserId = user.$id;
+    await onUserReady();
     showApp();
   }catch(e){
     showAuthError(e.message || "একটা সমস্যা হয়েছে");
   }
 };
+async function onUserReady(){
+  // নতুন ইউজারের জন্য পুরনো ইউজারের in-memory state/cache সাফ করা,
+  // নইলে একজনের ডেটা আরেকজনের সেশনে "টিকে" থাকতে পারে
+  audioDbPromise = null;
+  projDbPromise = null;
+  audioRestoreDone = false;
+  lastAudioSignature = null;
+  activeAudioSources = [];
+  stopPlayback();
+  stopAudioPlayback();
 
-checkSession();
+  S.layers = [emptyLayer("Layer 1", 1)];
+  S.imageObjects = [];
+  S.audioClips = [];
+  S.selectedObjectId = null;
+  S.selectedAudioClipId = null;
+  S.activeLayer = 0;
+  S.frame = 0;
+  S.currentProjectId = null;
+  S.focus = "layer";
+  past = []; future = [];
+
+  tryRestore();               // এই ইউজারের localStorage key থেকে রিস্টোর
+  renderAll();
+  const gotAudio = await restoreAudioClips();   // এই ইউজারের IndexedDB থেকে অডিও রিস্টোর
+  if(gotAudio) renderAll();
+ await rehydrateVideoObjects(S.imageObjects); preloadImageObjectSources(S.imageObjects).then(()=>{ renderAll(); paint(); }).catch(()=>{});
+}
+checkSession(); 
+
+document.getElementById("togglePassword").onclick = () => {
+  const pwField = document.getElementById("authPassword");
+  const btn = document.getElementById("togglePassword");
+  if(pwField.type === "password"){
+    pwField.type = "text";
+    btn.textContent = "🙈";
+  } else {
+    pwField.type = "password";
+    btn.textContent = "👁";
+  }
+};
+
+document.getElementById("forgotPasswordLink").onclick = async (e) => {
+  e.preventDefault();
+  const email = prompt("আপনার ইমেইল দিন:");
+  if(!email) return;
+  try{
+    await awAccount.createRecovery(email, window.location.origin + window.location.pathname);
+    alert("রিকভারি লিংক পাঠানো হয়েছে, ইমেইল চেক করুন।");
+  }catch(err){
+    alert("সমস্যা হয়েছে: " + (err.message || "আবার চেষ্টা করুন"));
+  }
+};
+
+async function handlePasswordRecovery(){
+  const params = new URLSearchParams(window.location.search);
+  const userId = params.get("userId");
+  const secret = params.get("secret");
+  if(!userId || !secret) return false;
+
+  const newPassword = prompt("নতুন পাসওয়ার্ড দিন:");
+  if(!newPassword){ return true; }
+  try{
+    await awAccount.updateRecovery(userId, secret, newPassword);
+    alert("পাসওয়ার্ড বদলানো হয়েছে! এবার নতুন পাসওয়ার্ড দিয়ে লগইন করুন।");
+  }catch(err){
+    alert("সমস্যা হয়েছে: " + (err.message || "লিংকটি মেয়াদোত্তীর্ণ হয়ে থাকতে পারে"));
+  }
+  window.history.replaceState({}, document.title, window.location.pathname);
+  return true;
+}
+handlePasswordRecovery();
 
 function setAppHeight(){
   const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
@@ -429,7 +578,10 @@ const TOOLS = [
   { id:"ellipse", icon:"◯", label:"Ellipse" }
 ];
 
-const AUTOSAVE_KEY = "frameo-studio-yt-v6";
+const AUTOSAVE_KEY_BASE = "frameo-studio-yt-v6";
+function getAutosaveKey(){
+  return currentUserId ? `${AUTOSAVE_KEY_BASE}::${currentUserId}` : null;
+}
 
 const EASINGS = {
   linear:    t => t,
@@ -821,6 +973,7 @@ function drawOnionLayer(ctx, layers, imageObjects, index, w, h, alpha, tint){
 function drawImageObjectsForLayer(ctx, imageObjects, layerId, layerOpacity, frame, w, h){
   imageObjects.forEach(o=>{
     if(o.layerId!==layerId) return;
+    if(o.hidden) return;
     const t = worldTransformAt(o, frame);
     if(!t) return;
     const shape = resolveActiveShape(o, frame);
@@ -1031,14 +1184,16 @@ function redo(){
 }
 
 /* ---------- IndexedDB (অডিও ক্লিপ) ---------- */
-const AUDIO_DB_NAME = "frameo-studio-audio";
+const AUDIO_DB_BASE = "frameo-studio-audio";
 const AUDIO_STORE = "clips";
 let audioDbPromise = null;
 function openAudioDb(){
+  if(!currentUserId) return Promise.resolve(null);
   if(audioDbPromise) return audioDbPromise;
+  const dbName = `${AUDIO_DB_BASE}::${currentUserId}`;
   audioDbPromise = new Promise((resolve, reject)=>{
     try{
-      const req = indexedDB.open(AUDIO_DB_NAME, 1);
+      const req = indexedDB.open(dbName, 1);
       req.onupgradeneeded = () => {
         const db = req.result;
         if(!db.objectStoreNames.contains(AUDIO_STORE)) db.createObjectStore(AUDIO_STORE);
@@ -1119,7 +1274,73 @@ async function restoreAudioClips(){
   return true;
 }
 
-
+/* ---------- IndexedDB (ভিডিও ফ্রেম) ---------- */
+const VIDEO_DB_BASE = "frameo-studio-video";
+const VIDEO_STORE = "frames";
+let videoDbPromise = null;
+function openVideoDb(){
+  if(!currentUserId) return Promise.resolve(null);
+  if(videoDbPromise) return videoDbPromise;
+  const dbName = `${VIDEO_DB_BASE}::${currentUserId}`;
+  videoDbPromise = new Promise((resolve, reject)=>{
+    try{
+      const req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(VIDEO_STORE)) db.createObjectStore(VIDEO_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }catch(e){ reject(e); }
+  }).catch(()=>null);
+  return videoDbPromise;
+}
+async function saveVideoFrames(objId, blobs){
+  const db = await openVideoDb();
+  if(!db) return;
+  try{
+    await new Promise(resolve=>{
+      const tx = db.transaction(VIDEO_STORE, "readwrite");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.objectStore(VIDEO_STORE).put(blobs, objId);
+    });
+  }catch(e){}
+}
+async function loadVideoFrames(objId){
+  const db = await openVideoDb();
+  if(!db) return null;
+  return await new Promise(resolve=>{
+    try{
+      const req = db.transaction(VIDEO_STORE, "readonly").objectStore(VIDEO_STORE).get(objId);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    }catch(e){ resolve(null); }
+  });
+}
+async function deleteVideoFrames(objId){
+  const db = await openVideoDb();
+  if(!db) return;
+  try{
+    await new Promise(resolve=>{
+      const tx = db.transaction(VIDEO_STORE, "readwrite");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.objectStore(VIDEO_STORE).delete(objId);
+    });
+  }catch(e){}
+}
+// রিলোডের পর blob URL অকেজো হয়ে যায় — IndexedDB থেকে আবার URL বানিয়ে src ঠিক করা
+async function rehydrateVideoObjects(objects){
+  const videoObjs = (objects||[]).filter(o => o && o.isVideo);
+  for(const obj of videoObjs){
+    const blobs = await loadVideoFrames(obj.id);
+    if(!blobs || !blobs.length) continue;
+    const urls = blobs.map(b => URL.createObjectURL(b));
+    obj.src = urls[0];
+    obj.shapes = (obj.shapes||[]).map((s, i) => ({ ...s, src: urls[i+1] || s.src }));
+  }
+}
 /* প্রজেক্ট লোড/রিস্টোরের সময় image object তালিকা সম্পূর্ণভাবে নতুন করে বানায় —
    পুরনো প্রজেক্টের leftover/dangling object কখনো টিকে থাকবে না */
 function sanitizeImageObjects(rawObjects, layers, opts){
@@ -1132,11 +1353,12 @@ function sanitizeImageObjects(rawObjects, layers, opts){
       layerId = lo ? lo.id : null;
     }
     return {
-      parentId: null, parentBindFrame: null, group: "",
+      parentId: null, parentBindFrame: null, group: "", hidden: false,
       pivotX: 0.5, pivotY: 0.5,
       shapes: [], shapeKeyframes: [],
       ...o,
-      layerId
+      layerId,
+      hidden: !!o.hidden
     };
   }).filter(o => o.layerId && validIds.has(o.layerId));
   const seen = new Set();
@@ -1182,9 +1404,12 @@ function autosaveSnapshot(){
 
 function autosaveNow(){
   clearTimeout(autosaveTimer);
-  try{
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(autosaveSnapshot()));
-  }catch(e){}
+  const key = getAutosaveKey();
+  if(key){
+    try{
+      localStorage.setItem(key, JSON.stringify(autosaveSnapshot()));
+    }catch(e){}
+  }
   saveAudioClips();
   /* Saved gallery projects are independent snapshots — never auto-overwritten */
 }
@@ -1196,7 +1421,9 @@ function autosave(){
 
 function tryRestore(){
   try{
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    const key = getAutosaveKey();
+    if(!key) return false;
+    const raw = localStorage.getItem(key);
     if(!raw) return false;
     const data = JSON.parse(raw);
     if(data && Array.isArray(data.layers) && data.layers.length){
@@ -1678,7 +1905,7 @@ function pasteToCurrentFrame(){
     const objId = uid();
     const newObj = {
       id: objId, layerId: activeL.id, src: c.src, natW: c.natW, natH: c.natH,
-      parentId: null, parentBindFrame: null, group: "",
+      parentId: null, parentBindFrame: null, group: "", hidden: false,
       pivotX: Number.isFinite(c.pivotX) ? c.pivotX : 0.5,
       pivotY: Number.isFinite(c.pivotY) ? c.pivotY : 0.5,
       shapes: [], shapeKeyframes: [],
@@ -1731,6 +1958,159 @@ function clearFrame(){
   } : l));
   renderAll();
 }
+
+/* ---------- Frame Range Selection (single + multi) ---------- */
+let selRange = null;        // {a,b} inclusive
+let rangeAnchor = null;     // pending long-press anchor
+let rangeClipboard = null;  // multi-frame clipboard
+let _suppressRangeClick = false;
+
+function getFrameRange(){
+  if(!selRange) return null;
+  const s = Math.min(selRange.a, selRange.b);
+  const e = Math.max(selRange.a, selRange.b);
+  if(s === e) return null;
+  return { s, e };
+}
+function clearFrameRange(){ selRange = null; rangeAnchor = null; }
+function consumeRangeClick(){
+  if(_suppressRangeClick){ _suppressRangeClick = false; return true; }
+  if(selRange || rangeAnchor !== null){ clearFrameRange(); updateRangeLabel(); renderTimeline(); }
+  return false;
+}
+function updateRangeLabel(){
+  const lbl = document.getElementById("rangeLabel");
+  if(!lbl) return;
+  const r = getFrameRange();
+  if(r) lbl.textContent = `Selected: ${r.s+1}–${r.e+1}  (${r.e-r.s+1} frames)`;
+  else if(rangeAnchor !== null) lbl.textContent = `Selected: ${S.frame+1}  • Range start ${rangeAnchor+1} — অন্য ফ্রেমে ট্যাপ করো`;
+  else lbl.textContent = `Selected: ${S.frame+1}`;
+}
+function setRange(a, b){
+  selRange = { a, b };
+  rangeAnchor = null;
+  _suppressRangeClick = true;
+  S.frame = Math.min(a, b);
+  updateFrameCounter();
+  updateRangeLabel();
+  renderTimeline();
+  paint();
+}
+
+function attachFrameSelection(node, f){
+  let timer = null, dragging = false, startX = 0, startY = 0;
+  const cancelTimer = () => { if(timer){ clearTimeout(timer); timer = null; } };
+
+  node.addEventListener("pointerdown", e => {
+    startX = e.clientX; startY = e.clientY;
+    dragging = false;
+    cancelTimer();
+    timer = setTimeout(() => {
+      timer = null;
+      dragging = true;
+      rangeAnchor = f;
+      selRange = { a: f, b: f };
+      _suppressRangeClick = true;
+      try{ node.setPointerCapture(e.pointerId); }catch(_){}
+      if(navigator.vibrate) navigator.vibrate(20);
+      updateRangeLabel();
+      renderTimeline();
+    }, 420);
+  });
+
+  node.addEventListener("pointermove", e => {
+    if(timer && (Math.abs(e.clientX-startX) > 8 || Math.abs(e.clientY-startY) > 8)) cancelTimer();
+    if(!dragging) return;
+    e.preventDefault();
+    const t = document.elementFromPoint(e.clientX, e.clientY);
+    const cellEl = t && t.closest && t.closest("[data-frame]");
+    if(cellEl){
+      const nf = Number(cellEl.dataset.frame);
+      if(Number.isFinite(nf) && selRange && selRange.b !== nf){
+        selRange.b = nf;
+        updateRangeLabel();
+        renderTimeline();
+      }
+    }
+  });
+
+  const endFn = () => {
+    cancelTimer();
+    if(dragging){
+      dragging = false;
+      _suppressRangeClick = true;
+      const r = getFrameRange();
+      if(r){ S.frame = r.s; updateFrameCounter(); }
+      else { rangeAnchor = selRange ? selRange.a : null; }
+      updateRangeLabel();
+      renderTimeline();
+      paint();
+    }
+  };
+  node.addEventListener("pointerup", endFn);
+  node.addEventListener("pointercancel", endFn);
+
+  node.addEventListener("click", e => {
+    if(rangeAnchor !== null && rangeAnchor !== f && !_suppressRangeClick){
+      e.stopPropagation();
+      setRange(rangeAnchor, f);
+      _suppressRangeClick = false;
+    }
+  }, true);
+}
+
+function copyFrameRange(r){
+  rangeClipboard = {
+    count: r.e - r.s + 1,
+    layers: S.layers.map(l => ({
+      id: l.id,
+      frames: l.frames.slice(r.s, r.e+1).map(fr => JSON.parse(JSON.stringify(fr || [])))
+    }))
+  };
+  clipboardStrokes = null;
+  alert(`ফ্রেম ${r.s+1}–${r.e+1} কপি করা হয়েছে!`);
+}
+
+function pasteFrameRange(){
+  const rc = rangeClipboard;
+  if(!rc) return;
+  const d = S.frame;
+  if(d + rc.count > frameCount()) ensureFrameCount(d + rc.count);
+  commit(ls => ls.map((l, li) => {
+    const src = rc.layers.find(x => x.id === l.id) || rc.layers[li];
+    if(!src) return l;
+    const frames = [...l.frames];
+    for(let i=0; i<rc.count; i++){
+      frames[d+i] = (src.frames[i] || []).map(s => ({ ...s, id: uid() }));
+    }
+    return { ...l, frames };
+  }));
+  selRange = rc.count > 1 ? { a: d, b: d + rc.count - 1 } : null;
+  rangeAnchor = null;
+  renderAll();
+  updateRangeLabel();
+}
+
+function clearFrameRangeContent(r){
+  commit(ls => ls.map(l => ({
+    ...l,
+    frames: l.frames.map((fr, fi) => (fi >= r.s && fi <= r.e) ? [] : fr)
+  })));
+  renderAll();
+  updateRangeLabel();
+}
+
+function deleteFrameRange(r){
+  const total = frameCount();
+  const count = r.e - r.s + 1;
+  if(count >= total){ mutateFrames(() => [[]]); S.frame = 0; clearFrameRange(); renderAll(); updateRangeLabel(); return; }
+  mutateFrames(frames => frames.filter((_, i) => i < r.s || i > r.e));
+  S.frame = Math.max(0, Math.min(frameCount()-1, r.s));
+  clearFrameRange();
+  renderAll();
+  updateRangeLabel();
+}
+
 
 async function detectAlphaContentBox(img){
   const DET_MAX = 256;
@@ -1847,7 +2227,7 @@ async function importPhoto(file){
     id: objId,
     layerId: S.layers[S.activeLayer].id,
     src, natW, natH,
-    parentId: null, parentBindFrame: null, group: "",
+    parentId: null, parentBindFrame: null, group: "", hidden: false,
     pivotX: 0.5, pivotY: 0.5,
     shapes: [], shapeKeyframes: [],
     keyframes: [ { frame: S.frame, x, y, w, h, rotation: 0, opacity: 1, flipX: false, flipY: false, easing: "linear" } ]
@@ -1860,7 +2240,128 @@ async function importPhoto(file){
   S.tool = "select";
   renderAll();
 }
+async function extractVideoFrames(file, onProgress){
+  const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.src = url;
 
+  await new Promise((resolve,reject)=>{
+    video.onloadedmetadata = () => resolve();
+    video.onerror = () => reject(new Error("ভিডিও লোড ব্যর্থ"));
+  });
+
+  const vw = video.videoWidth || 640, vh = video.videoHeight || 360;
+  const duration = video.duration || 0;
+  const fps = S.fps;
+  const totalFrames = Math.max(1, Math.round(duration*fps));
+
+  const off = document.createElement("canvas");
+  off.width = vw; off.height = vh;
+  const octx = off.getContext("2d");
+
+  // ফ্রেম আসলেই পুরোপুরি ডিকোড/পেইন্ট হয়েছে কিনা তা নিশ্চিত করার হেল্পার।
+  // requestVideoFrameCallback থাকলে সেটাই সবচেয়ে নির্ভরযোগ্য; না থাকলে
+  // seeked-এর পরে দুইটা requestAnimationFrame অপেক্ষা করে fallback করা হয়।
+  const hasRVFC = typeof video.requestVideoFrameCallback === "function";
+
+  function seekAndWaitFrame(t){
+    return new Promise((resolve)=>{
+      if(hasRVFC){
+        let done = false;
+        const onSeeked = () => {
+          video.removeEventListener("seeked", onSeeked);
+          video.requestVideoFrameCallback(() => {
+            if(!done){ done = true; resolve(); }
+          });
+          // safety fallback যদি rVFC কোনো কারণে না ডাকে
+          setTimeout(() => { if(!done){ done = true; resolve(); } }, 300);
+        };
+        video.addEventListener("seeked", onSeeked);
+        video.currentTime = t;
+      } else {
+        const onSeeked = () => {
+          video.removeEventListener("seeked", onSeeked);
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        };
+        video.addEventListener("seeked", onSeeked);
+        video.currentTime = t;
+      }
+    });
+  }
+
+  const blobs = [];
+  for(let i=0; i<totalFrames; i++){
+    const t = Math.min(Math.max(0, duration-0.001), i/fps);
+    await seekAndWaitFrame(t);
+    octx.clearRect(0, 0, vw, vh);
+    octx.drawImage(video, 0, 0, vw, vh);
+    const blob = await new Promise(res => off.toBlob(res, "image/jpeg", 0.82));
+    blobs.push(blob);
+    if(onProgress) onProgress(i+1, totalFrames);
+  }
+
+  URL.revokeObjectURL(url);
+  return { blobs, vw, vh, totalFrames };
+}
+async function importVideoFile(file){
+  if(!file) return;
+  if(exportState.active) return;
+  exportState.active = true;
+  showExportOverlay("ভিডিও ফ্রেম বের করা হচ্ছে…");
+
+  let result;
+  try{
+    result = await extractVideoFrames(file, (done,total)=>{
+      showExportOverlay(`ভিডিও ফ্রেম বের করা হচ্ছে ${done}/${total}`);
+    });
+  }catch(e){
+    exportState.active = false;
+    hideExportOverlay();
+    alert("ভিডিও প্রসেস করা যায়নি: " + (e && e.message ? e.message : String(e)));
+    return;
+  }
+
+  const { blobs, vw, vh, totalFrames } = result;
+  const urls = blobs.map(b => URL.createObjectURL(b));
+  await Promise.all(urls.map(u => loadImage(u).catch(()=>null)));
+
+  const ar = vw/vh;
+  const stageAr = STAGE_W/STAGE_H;
+  let w = 1, h = 1;
+  if(ar > stageAr) h = stageAr/ar; else w = ar/stageAr;
+  const x = (1-w)/2, y = (1-h)/2;
+
+  const objId = uid();
+  const baseFrame = S.frame;
+  ensureFrameCount(baseFrame + totalFrames);
+
+  const shapeKeyframes = urls.map((u, idx) => ({ frame: baseFrame+idx, shapeId: idx===0 ? "base" : ("vf_"+idx) }));
+  const shapes = urls.slice(1).map((u, i) => ({ id: "vf_"+(i+1), src: u, natW: vw, natH: vh }));
+
+  const newObj = {
+    id: objId,
+    layerId: S.layers[S.activeLayer].id,
+    src: urls[0], natW: vw, natH: vh,
+    parentId: null, parentBindFrame: null, group: "", hidden: false,
+    pivotX: 0.5, pivotY: 0.5,
+    isVideo: true,
+    shapes, shapeKeyframes,
+    keyframes: [ { frame: baseFrame, x, y, w, h, rotation: 0, opacity: 1, flipX: false, flipY: false, easing: "linear" } ]
+  };
+
+  commit((ls, objs) => ({ imageObjects: [...objs, newObj] }));
+  focusLayer();
+  S.selectedObjectId = objId;
+  S.tool = "select";
+
+  await saveVideoFrames(objId, blobs);
+
+  exportState.active = false;
+  hideExportOverlay();
+  renderAll();
+}
 let pendingShapeTargetObjId = null;
 
 async function addShapeToLibrary(obj, file){
@@ -2567,7 +3068,7 @@ function hideExportOverlay(){
 const el = (tag, cls, html) => {
   const e = document.createElement(tag);
   if(cls) e.className = cls;
-  if(html!==undefined) e.innerHTML = html;
+  if(html!==undefined) e.textContent = html;
   return e;
 };
 
@@ -2944,11 +3445,16 @@ function renderTimeline(){
 
   const colHeads = el("div", "xsheet-colheads");
   for(let f=0; f<fc; f++){
-    const h = el("div", `xsheet-colhead${f===S.frame ? " current" : ""}`, String(f+1));
+    const _rh = getFrameRange();
+    let hcls = `xsheet-colhead${f===S.frame ? " current" : ""}`;
+    if(_rh && f>=_rh.s && f<=_rh.e) hcls += " in-range";
+    const h = el("div", hcls, String(f+1));
     h.dataset.frame = String(f);
-    h.onclick = () => { S.frame = f; renderAll(); };
+    attachFrameSelection(h, f);
+    h.onclick = () => { if(consumeRangeClick()) return; S.frame = f; renderAll(); };
     colHeads.appendChild(h);
   }
+
   headerRow.appendChild(colHeads);
   if(S.audioClips.length > 0) table.appendChild(buildAudioTrackRow(fc));
   table.appendChild(headerRow);
@@ -2988,6 +3494,12 @@ function renderTimeline(){
 
       if(isCurrentCol) cls.push("current-frame");
       if(isActiveCell && S.focus !== 'audio') cls.push("active-cell");
+      const _r = getFrameRange();
+      if(_r && f>=_r.s && f<=_r.e){
+        cls.push("in-range");
+        if(f===_r.s) cls.push("range-start");
+        if(f===_r.e) cls.push("range-end");
+      }
 
       const cell = el("div", cls.join(" "));
       cell.dataset.frame = String(f);
@@ -3002,7 +3514,9 @@ function renderTimeline(){
         if(hasContent){ cell.appendChild(el("span", "xsheet-dot")); }
       }
 
+      attachFrameSelection(cell, f);
       cell.onclick = () => {
+        if(consumeRangeClick()) return;
         focusLayer();
         setActiveLayer(li);
         S.frame = f;
@@ -3012,6 +3526,7 @@ function renderTimeline(){
         }
         renderAll();
       };
+
       cellsWrap.appendChild(cell);
     }
 
@@ -3072,16 +3587,30 @@ function drawClipWaveform(canvas, clip, widthPx){
 }
 
 function clampClipStart(clip, wanted){
-  let minF = 0;
-  let maxF = Infinity;
+  wanted = Math.max(0, Math.round(wanted));
   const dur = clipDurationFrames(clip);
+  const movingRight = wanted > clip.startFrame;
+
+  let result = wanted;
+
   S.audioClips.forEach(o => {
-    if(o.id===clip.id) return;
-    const oStart = o.startFrame, oEnd = clipEndFrame(o);
-    if(oEnd <= clip.startFrame) minF = Math.max(minF, oEnd);
-    else if(oStart >= clipEndFrame(clip)) maxF = Math.min(maxF, oStart - dur);
+    if(o.id === clip.id) return; // নিজের সাথে তুলনা না করা
+
+    const oStart = o.startFrame;
+    const oEnd = clipEndFrame(o);
+
+    // wanted পজিশনে গেলে সত্যিই ওভারল্যাপ হবে কিনা চেক করো
+    const wouldOverlap = result < oEnd && (result + dur) > oStart;
+    if(!wouldOverlap) return;
+
+    if(movingRight){
+      result = Math.min(result, oStart - dur);
+    } else {
+      result = Math.max(result, oEnd);
+    }
   });
-  return Math.max(minF, Math.min(maxF, Math.max(0, wanted)));
+
+  return Math.max(0, result);
 }
 
 function buildAudioTrackRow(fc){
@@ -3336,6 +3865,9 @@ function renderAllObjectsPanel(){
   const list = document.createElement("div");
   list.style.cssText = "display:flex;flex-direction:column;gap:.35rem;margin-top:.4rem;";
 
+  const selObjForGroup = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+  const selGroup = selObjForGroup ? (selObjForGroup.group||"").trim() : "";
+
   S.imageObjects.forEach(o=>{
     const row = document.createElement("div");
     row.style.cssText = "display:flex;align-items:center;gap:.4rem;";
@@ -3343,10 +3875,16 @@ function renderAllObjectsPanel(){
     const lo = S.layers.find(l=>l.id===o.layerId);
     const isSel = o.id===S.selectedObjectId;
     const shapeCount = (o.shapes||[]).length;
-    const label = (lo ? lo.name : "?") + (o.group ? ` [${o.group}]` : "") + (o.parentId ? " 🔗" : "") + ` · ${o.keyframes.length}kf` + (shapeCount ? ` · ${shapeCount+1} shape` : "");
+    const inSelGroup = !!selGroup && (o.group||"").trim()===selGroup;
+    const label = (o.hidden ? "🚫 " : "") + (lo ? lo.name : "?") + (o.group ? ` [${o.group}]` : "") + (o.parentId ? " 🔗" : "") + ` · ${o.keyframes.length}kf` + (shapeCount ? ` · ${shapeCount+1} shape` : "");
 
     const btn = el("button", `chip compact-btn${isSel ? " chip-accent" : ""}`, label);
     btn.style.flex = "1";
+    if(inSelGroup && !isSel){
+      btn.style.border = "1px solid var(--accent, var(--primary))";
+      btn.style.boxShadow = "inset 0 0 0 1px var(--accent, var(--primary))";
+    }
+    if(o.hidden) btn.style.opacity = ".55";
     btn.onclick = () => {
       focusLayer();
       S.selectedObjectId = o.id;
@@ -3358,6 +3896,7 @@ function renderAllObjectsPanel(){
 
     const delBtn = el("button", "chip compact-btn chip-danger", "✕");
     delBtn.onclick = () => {
+    if(o.isVideo) deleteVideoFrames(o.id);
       commit((ls,objs) => ({ imageObjects: clearDanglingParents(objs.filter(x=>x.id!==o.id)) }));
       if(S.selectedObjectId===o.id) S.selectedObjectId = null;
       renderAll();
@@ -3430,6 +3969,37 @@ function setObjectGroup(obj, group){
   autosave();
 }
 
+function groupMembers(group){
+  const g = (group||"").trim();
+  if(!g) return [];
+  return S.imageObjects.filter(o => (o.group||"").trim() === g);
+}
+
+/* একই group নামের সব object একসাথে show/hide */
+function toggleGroupVisibility(group){
+  const g = (group||"").trim();
+  if(!g) return;
+  const members = groupMembers(g);
+  if(!members.length) return;
+  const anyVisible = members.some(o => !o.hidden);
+  commit((ls, objs) => ({ imageObjects: objs.map(o =>
+    (o.group||"").trim() === g ? { ...o, hidden: anyVisible } : o
+  ) }));
+  renderAll();
+}
+
+/* এই object-কে group-এর বাকি সবার parent বানাও */
+function setGroupParent(obj){
+  const g = (obj.group||"").trim();
+  if(!g) return;
+  commit((ls, objs) => ({ imageObjects: objs.map(o => {
+    if(o.id === obj.id) return o;
+    if((o.group||"").trim() !== g) return o;
+    return { ...o, parentId: obj.id, parentBindFrame: S.frame };
+  }) }));
+  renderAll();
+}
+
 function addKeyframeToSelectedObject(){
   const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
   if(!obj) return;
@@ -3454,6 +4024,34 @@ function renderTopKeyframeButton(){
     const hasSelection = S.imageObjects.some(o=>o.id===S.selectedObjectId);
     btn.disabled = !hasSelection;
   }
+}
+function renderTopEasingSelect(){
+  const wrap = document.getElementById("easingTopWrap");
+  const sel = document.getElementById("easingTopSelect");
+  const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
+  const kf = obj ? obj.keyframes.find(k=>k.frame===S.frame) : null;
+
+  if(S.tool!=="select" || !obj || !kf){
+    wrap.style.display = "none";
+    return;
+  }
+  wrap.style.display = "inline-flex";
+
+  sel.innerHTML = "";
+  Object.keys(EASINGS).forEach(k=>{
+    const o = document.createElement("option");
+    o.value = k;
+    o.textContent = EASING_LABELS[k];
+    if(kf.easing===k) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.onchange = (e) => {
+    const val = e.target.value;
+    commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
+      ...o, keyframes: o.keyframes.map(k => k.frame===S.frame ? { ...k, easing: val } : k)
+    }) }));
+    renderAll();
+  };
 }
 
 function buildShapeThumb(shape, isActive, obj){
@@ -3500,6 +4098,7 @@ function renderObjectPanel(){
   })()));
   const delObjBtn = el("button", "chip chip-danger compact-btn ml-auto", "Delete Object");
   delObjBtn.onclick = () => {
+  if(obj.isVideo) deleteVideoFrames(obj.id);
     commit((ls,objs) => ({ imageObjects: clearDanglingParents(objs.filter(o=>o.id!==obj.id)) }));
     S.selectedObjectId = null;
     renderAll();
@@ -3543,14 +4142,46 @@ function renderObjectPanel(){
   panel.appendChild(parentField);
 
   const groupField = el("div", "field");
-  groupField.appendChild(el("div", "label", "GROUP (যেমন: mouth, eye)"));
+  groupField.appendChild(el("div", "label", "GROUP NAME "));
   const groupInput = document.createElement("input");
   groupInput.type = "text";
   groupInput.value = obj.group || "";
-  groupInput.placeholder = "যেমন: mouth";
+  groupInput.placeholder = "যেমন: body";
   groupInput.style.cssText = "width:100%;margin-top:.35rem;padding:.35rem .4rem;background:var(--secondary);color:var(--foreground);border:1px solid var(--border);border-radius:6px;font-size:.68rem;";
   groupInput.oninput = (e) => setObjectGroup(obj, e.target.value);
   groupField.appendChild(groupInput);
+
+  const gName = (obj.group||"").trim();
+  if(gName){
+    const members = groupMembers(gName);
+    const gRow = el("div", "layer-item-row");
+    gRow.style.marginTop = ".35rem";
+
+    const visBtn = el("button", "chip compact-btn flex-1", `👁 Group Show/Hide (${members.length})`);
+    visBtn.title = `"${gName}" group-এর ${members.length}টি object একসাথে show/hide করো`;
+    visBtn.onclick = () => toggleGroupVisibility(gName);
+    gRow.appendChild(visBtn);
+
+    const parBtn = el("button", "chip compact-btn flex-1", "🔗 Group Parent বানাও");
+    parBtn.title = `"${gName}" group-এর বাকি সব object-কে এই object-এর child বানিয়ে দেবে (এই ফ্রেমে bind)`;
+    parBtn.onclick = () => setGroupParent(obj);
+    gRow.appendChild(parBtn);
+
+    groupField.appendChild(gRow);
+  }
+
+  const pivotResetRow = el("div", "layer-item-row");
+  pivotResetRow.style.marginTop = ".35rem";
+  const pivotReset = el("button", "chip compact-btn flex-1", "🎯 PIVOT সেন্টারে রিসেট");
+  pivotReset.onclick = () => {
+    const startKfs = obj.keyframes.map(k=>({ ...k }));
+    applyPivotChange(obj, startKfs, pivotOf(obj), { px:0.5, py:0.5 });
+    autosave();
+    renderObjectPanel();
+    paint();
+  };
+  pivotResetRow.appendChild(pivotReset);
+  groupField.appendChild(pivotResetRow);
   panel.appendChild(groupField);
 
   const shapeField = el("div", "field");
@@ -3579,7 +4210,7 @@ function renderObjectPanel(){
     shapeGrid.appendChild(wrap);
   });
 
-  const addShapeBtn = el("button", "chip compact-btn", "+ শেপ যোগ করো");
+  const addShapeBtn = el("button", "chip compact-btn", "+");
   addShapeBtn.style.cssText = "width:56px;height:56px;";
   addShapeBtn.onclick = () => {
     pendingShapeTargetObjId = obj.id;
@@ -3611,7 +4242,7 @@ function renderObjectPanel(){
   const curT = objectTransformAt(obj, S.frame);
 
   const flipField = el("div", "field");
-  flipField.appendChild(el("div", "label", "FLIP (এই ফ্রেমে)"));
+  flipField.appendChild(el("div", "label", ""));
   const flipRow = el("div", "layer-item-row");
   flipRow.style.marginTop = ".35rem";
 
@@ -3634,35 +4265,6 @@ function renderObjectPanel(){
     const kfHeader = document.createElement("div");
     kfHeader.style.cssText = "display:flex;align-items:center;gap:.4rem;";
     kfHeader.appendChild(el("div", "label", `KEYFRAME #${S.frame+1}`));
-
-    const easingSel = document.createElement("select");
-    easingSel.style.cssText = "margin-left:auto;font-size:.62rem;background:var(--secondary);color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:2px 4px;";
-    Object.keys(EASINGS).forEach(k=>{
-      const o = document.createElement("option");
-      o.value = k;
-      o.textContent = EASING_LABELS[k];
-      if(kfAtPlayhead.easing===k) o.selected = true;
-      easingSel.appendChild(o);
-    });
-    easingSel.onchange = (e) => {
-      const val = e.target.value;
-      commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
-        ...o, keyframes: o.keyframes.map(k => k.frame===S.frame ? { ...k, easing: val } : k)
-      }) }));
-      renderAll();
-    };
-    kfHeader.appendChild(easingSel);
-
-    if(kfs.length>1){
-      const delKfBtn = el("button", "chip compact-btn chip-danger", "Delete KF");
-      delKfBtn.onclick = () => {
-        commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
-          ...o, keyframes: o.keyframes.filter(k => k.frame!==S.frame)
-        }) }));
-        renderAll();
-      };
-      kfHeader.appendChild(delKfBtn);
-    }
     kfField.appendChild(kfHeader);
   } else {
     const hint = document.createElement("div");
@@ -3743,15 +4345,6 @@ function renderObjectPanel(){
   const curPv = pivotOf(obj);
   pivotField.appendChild(el("div", "label",
     `PIVOT (অ্যাংকর) ${Math.round(curPv.px*100)}% / ${Math.round(curPv.py*100)}% — ক্যানভাসে ডট টেনে সরান`));
-  const pivotReset = el("button", "chip w-full", "PIVOT সেন্টারে রিসেট");
-  pivotReset.onclick = () => {
-    const startKfs = obj.keyframes.map(k=>({ ...k }));
-    applyPivotChange(obj, startKfs, pivotOf(obj), { px:0.5, py:0.5 });
-    autosave();
-    renderObjectPanel();
-    paint();
-  };
-  pivotField.appendChild(pivotReset);
   panel.appendChild(pivotField);
 
 
@@ -3826,7 +4419,8 @@ function renderAll(){
   const onionAfterNumInput = document.querySelector("#onionAfterStepperRow .stepper-input");
   if(onionAfterNumInput) onionAfterNumInput.value = S.onionAfter;
 
-  renderTopKeyframeButton();
+  renderTopKeyframeButton(); 
+  renderTopEasingSelect();
   renderTimeline();
   renderObjectPanel();
   syncAudioToFrame();
@@ -3922,7 +4516,7 @@ document.getElementById("btnCopy").onclick = copyCurrentFrame;
 document.getElementById("btnPaste").onclick = pasteToCurrentFrame;
 document.getElementById("btnClear").onclick = clearFrame;
 document.getElementById("btnDelFrame").onclick = deleteFrame;
-
+ 
 const exportDropdown = document.getElementById("exportDropdown");
 document.getElementById("btnExportTab").onclick = (e) => {
   e.stopPropagation();
@@ -3930,7 +4524,18 @@ document.getElementById("btnExportTab").onclick = (e) => {
 };
 
 document.addEventListener("click", () => { exportDropdown.classList.add("hidden"); });
-
+const moreDropdown = document.getElementById("moreDropdown");
+const btnMoreMenu = document.getElementById("btnMoreMenu");
+btnMoreMenu.onclick = (e) => {
+  e.stopPropagation();
+  const willOpen = moreDropdown.classList.contains("hidden");
+  moreDropdown.classList.toggle("hidden", !willOpen);
+  btnMoreMenu.classList.toggle("menu-open", willOpen);
+};
+document.addEventListener("click", () => {
+  moreDropdown.classList.add("hidden");
+  btnMoreMenu.classList.remove("menu-open");
+});
 document.getElementById("b4k").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(2); };
 document.getElementById("b1080").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(1); };
 document.getElementById("bpng").onclick = () => { exportDropdown.classList.add("hidden"); exportPng(); };
@@ -3956,7 +4561,15 @@ document.getElementById("audioInput").addEventListener("change", e => {
   });
   e.target.value = "";
 });
-
+document.getElementById("btnImportVideo").onclick = () => { document.getElementById("videoInput").click(); };
+document.getElementById("videoInput").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  importVideoFile(file).catch(err => {
+    console.error("ভিডিও ইমপোর্ট ব্যর্থ:", err);
+    alert("ভিডিও যোগ করতে সমস্যা হয়েছে: " + (err && err.message ? err.message : String(err)));
+  });
+  e.target.value = "";
+});
 document.getElementById("shapeInput").addEventListener("change", e => {
   const file = e.target.files && e.target.files[0];
   const targetId = pendingShapeTargetObjId;
@@ -3973,14 +4586,16 @@ document.getElementById("shapeInput").addEventListener("change", e => {
 
 
 /* ================= Project Gallery (IndexedDB) ================= */
-const PROJ_DB_NAME = "frameo-studio-projects";
+const PROJ_DB_BASE = "frameo-studio-projects";
 const PROJ_STORE = "projects";
 let projDbPromise = null;
 function openProjDb(){
+  if(!currentUserId) return Promise.resolve(null);
   if(projDbPromise) return projDbPromise;
+  const dbName = `${PROJ_DB_BASE}::${currentUserId}`;
   projDbPromise = new Promise((resolve, reject)=>{
     try{
-      const req = indexedDB.open(PROJ_DB_NAME, 1);
+      const req = indexedDB.open(dbName, 1);
       req.onupgradeneeded = () => {
         const db = req.result;
         if(!db.objectStoreNames.contains(PROJ_STORE)) db.createObjectStore(PROJ_STORE, { keyPath: "id" });
@@ -4220,6 +4835,8 @@ async function loadProject(id){
   renderAll();
   paint();
   // সব ছবি decode হওয়ার পর আবার render, যাতে canvas ফাঁকা না দেখায়
+  await rehydrateVideoObjects(S.imageObjects);
+if(loadVersion !== projectLoadVersion) return;
   await preloadImageObjectSources(S.imageObjects);
   if(loadVersion !== projectLoadVersion) return;
   renderAll();
@@ -4243,11 +4860,7 @@ function fmtProjDate(ts){
 let openMenuId = null;
 
 async function renderGallery(){
-  
   const rows = await listProjects();
- 
-  const upd = document.getElementById("btnGalleryUpdate");
-  if(upd) upd.classList.toggle("hidden", !rows.some(r => r.id === S.currentProjectId));
   galleryGrid.innerHTML = "";
   galleryEmpty.classList.toggle("hidden", rows.length > 0);
   rows.forEach(rec => {
@@ -4362,18 +4975,19 @@ document.getElementById("btnProjects").onclick = () => { autosaveNow(); openGall
 document.getElementById("btnGalleryClose").onclick = closeGallery;
 document.getElementById("btnGalleryNew").onclick = startNewProject;
 document.getElementById("btnGallerySaveAs").onclick = saveAsNewProject;
-document.getElementById("btnGalleryUpdate").onclick = async () => {
-  if(!S.currentProjectId) return;
-  const rec = await getProjectMeta(S.currentProjectId);
-  if(!rec){ S.currentProjectId = null; renderGallery(); return; }
-  if(!confirm(`"${rec.name}" ফাইলটি বর্তমান কাজ দিয়ে আপডেট করবেন?`)) return;
-  await saveCurrentProject();
-  S.currentView = "files";
-  if(location.hash !== "#files") location.hash = "#files";
-  renderGallery();
+document.getElementById("btnLogout").onclick = async () => {
+  if(!confirm("লগআউট করবেন?")) return;
+  try{ await awAccount.deleteSession("current"); }catch(e){}
+  currentUserId = null;
+  stopPlayback();
+  stopAudioPlayback();
+  S.layers = [emptyLayer("Layer 1", 1)];
+  S.imageObjects = [];
+  S.audioClips = [];
+  S.currentProjectId = null;
+  showAuthScreen();
 };
 
-tryRestore();
 if(location.hash === "#files") S.currentView = "files";
 else if(location.hash === "#canvas") S.currentView = "canvas";
 renderAll();
@@ -4383,13 +4997,6 @@ preloadImageObjectSources(S.imageObjects).then(()=>{ renderAll(); paint(); }).ca
 
 requestAnimationFrame(resizeCanvas);
 window.addEventListener("resize", resizeCanvas);
-
-// অডিও ক্লিপ IndexedDB থেকে ফিরিয়ে আনো
-restoreAudioClips().then(ok => {
-  if(!ok) return;
-  if(S.selectedAudioClipId && !S.audioClips.some(c=>c.id===S.selectedAudioClipId)) S.selectedAudioClipId = null;
-  renderAll();
-}).catch(()=>{ audioRestoreDone = true; });
 
 // ট্যাব বন্ধ/লুকানোর আগে সাথে সাথে সেভ
 window.addEventListener("beforeunload", autosaveNow);
@@ -4401,4 +5008,4 @@ document.addEventListener("visibilitychange", () => { if(document.hidden) autosa
 </script>
 
 </body>
-</html>
+  </html>
