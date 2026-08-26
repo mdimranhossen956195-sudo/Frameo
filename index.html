@@ -62,7 +62,9 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .stage-wrap{position:relative;flex:1;min-width:0;width:100%;aspect-ratio:16/9;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-panel);background:var(--background);touch-action:none;display:flex;align-items:center;justify-content:center;}
 .stage{display:block;background:#ffffff;touch-action:none;-webkit-user-select:none;user-select:none;box-shadow:0 4px 20px rgba(0,0,0,0.3);}
 
-.tool-rail{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.5rem;border-radius:var(--radius);background:var(--card);border:1px solid var(--border);padding:.5rem;box-shadow:var(--shadow-panel);}
+.tool-rail{position:relative;display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:.5rem;border-radius:var(--radius);background:var(--card);border:1px solid var(--border);padding:.5rem;box-shadow:var(--shadow-panel);overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.tool-rail::-webkit-scrollbar{display:none;}
+.tool-rail > *{flex:0 0 auto;}
 .tool-rail.tool-rail--shapes{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch;}
 .quick-shape-thumb{flex:0 0 auto;width:2.6rem;height:2.6rem;padding:2px;}
 .quick-shape-thumb img{width:100%;height:100%;object-fit:contain;border-radius:6px;background:rgba(255,255,255,.85);}
@@ -283,7 +285,8 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 <div id="exportDropdown" class="export-dropdown hidden">
   <button id="b4k" class="chip w-full chip-accent" style="margin-bottom:.35rem;">Export MP4 — YouTube 4K</button>
   <button id="b1080" class="chip w-full" style="margin-bottom:.35rem;">Export MP4 — YouTube 1080p</button>
-  <button id="bpng" class="chip w-full">Export PNG Frame</button>
+  <button id="bpng" class="chip w-full" style="margin-bottom:.35rem;">Export PNG Frame</button>
+  <button id="bpngTransparent" class="chip w-full">Export PNG (Transparent)</button>
 </div>
 
 </header>
@@ -482,8 +485,10 @@ async function onUserReady(){
   // নইলে একজনের ডেটা আরেকজনের সেশনে "টিকে" থাকতে পারে
   audioDbPromise = null;
   projDbPromise = null;
+  imageDbPromise = null;
   audioRestoreDone = false;
   lastAudioSignature = null;
+  lastImageAssetSignature = null;
   activeAudioSources = [];
   stopPlayback();
   stopAudioPlayback();
@@ -503,8 +508,10 @@ async function onUserReady(){
   renderAll();
   const gotAudio = await restoreAudioClips();   // এই ইউজারের IndexedDB থেকে অডিও রিস্টোর
   if(gotAudio) renderAll();
- await rehydrateVideoObjects(S.imageObjects); preloadImageObjectSources(S.imageObjects).then(()=>{ renderAll(); paint(); }).catch(()=>{});
-}
+  await restoreImageAssets(); // ছবির আসল ডেটা IndexedDB থেকে রিস্টোর
+  await rehydrateVideoObjects(S.imageObjects);
+  preloadImageObjectSources(S.imageObjects).then(()=>{ renderAll(); paint(); }).catch(()=>{});
+  }
 checkSession(); 
 
 document.getElementById("togglePassword").onclick = () => {
@@ -571,8 +578,12 @@ const PALETTE = [
 const TOOLS = [
   { id:"select", icon:"⛶", label:"Select / Transform" },
   { id:"brush", icon:"🖌️", label:"Brush" },
+  { id:"curve", icon:"⤴️", label:"Curve (Bezier)" },
   { id:"settings", icon:"⚙️", label:"Tool Settings" },
   { id:"eraser", icon:"🧽", label:"Eraser" },
+  { id:"bucket", icon:"🛢", label:"Bucket Fill" },
+  { id:"eyedropper", icon:"🌡", label:"Eyedropper" },
+  { id:"lasso", icon:"𓋜", label:"Lasso Select (Drawing)" },
   { id:"line", icon:"／", label:"Line" },
   { id:"rect", icon:"▭", label:"Rect" },
   { id:"ellipse", icon:"◯", label:"Ellipse" }
@@ -808,6 +819,39 @@ function getParentAdjustFactors(obj, frame){
 
 let clipboardStrokes = null;
 let clipboardImageObject = null;
+let clipboardBucketObjects = null;
+
+function bucketObjectFrame(o){
+  if(!o || !o.fromBucket) return null;
+  if(Number.isFinite(o.bucketFrame)) return o.bucketFrame;
+  const first = Array.isArray(o.keyframes) ? o.keyframes[0] : null;
+  return first && Number.isFinite(first.frame) ? first.frame : null;
+}
+
+function bucketObjectsForLayerFrame(layerId, frame){
+  return (S.imageObjects || []).filter(o =>
+    o && o.fromBucket && !o.isVideo && o.layerId===layerId && bucketObjectFrame(o)===frame
+  );
+}
+
+function cloneBucketObject(o, frame, layerId, offset=0){
+  return {
+    ...o,
+    id: uid(),
+    layerId,
+    bucketFrame: frame,
+    parentId: null,
+    parentBindFrame: null,
+    keyframes: (o.keyframes || []).map(k => ({
+      ...k,
+      frame,
+      x: Math.min(1, k.x + offset),
+      y: Math.min(1, k.y + offset)
+    })),
+    shapes: (o.shapes || []).map(s => ({ ...s })),
+    shapeKeyframes: (o.shapeKeyframes || []).map(k => ({ ...k }))
+  };
+}
 
 const uid = () => Math.random().toString(36).slice(2,10);
 
@@ -819,29 +863,119 @@ const emptyLayer = (name, frameCount) => ({
   frames: Array.from({length: frameCount}, () => [])
 });
 
-const imageCache = new Map();
+/* ================= Frame Memory Layer =================
+   IndexedDB → Blob (blob URL) → Lazy Decode → LRU decoded-image cache → Canvas
+   এখানে কোনো frame মুছে যায় না; শুধু decoded Image RAM থেকে সরানো হয়।
+   পরে দরকার হলে একই blob URL থেকে আবার decode হবে। */
+const imageCache = new Map();               // src -> HTMLImageElement (LRU order)
+const evictableSrcs = new Set();            // শুধু ভিডিও-ফ্রেম src গুলো evict হবে
+const pendingDecodes = new Map();           // src -> Promise
+let DECODED_CACHE_LIMIT = 48;               // configurable: 30–60
+
+function setDecodedCacheLimit(n){
+  DECODED_CACHE_LIMIT = Math.max(8, Math.min(200, n|0));
+  trimImageCache();
+}
+
+function markEvictableSrcs(srcs){
+  (srcs || []).forEach(s => { if(typeof s === "string" && s) evictableSrcs.add(s); });
+}
+
+function trimImageCache(){
+  if(imageCache.size <= DECODED_CACHE_LIMIT) return;
+  for(const src of [...imageCache.keys()]){
+    if(imageCache.size <= DECODED_CACHE_LIMIT) break;
+    if(!evictableSrcs.has(src)) continue;   // pinned (সাধারণ ছবি/shape) — রাখা হবে
+    imageCache.delete(src);                 // শুধু decoded memory ফ্রি, blob অটুট
+  }
+}
+
+// LRU touch: ব্যবহার হলে সবচেয়ে recent হিসেবে সরানো হয়
+function getDecodedImage(src){
+  const img = imageCache.get(src);
+  if(!img) return null;
+  if(!img.complete) return null;
+  imageCache.delete(src);
+  imageCache.set(src, img);
+  return img;
+}
 
 function loadImage(src){
-  const cached = imageCache.get(src);
-  if(cached && cached.complete){
-    return Promise.resolve(cached);
-  }
-  return new Promise((resolve,reject)=>{
+  const cached = getDecodedImage(src);
+  if(cached) return Promise.resolve(cached);
+  const pending = pendingDecodes.get(src);
+  if(pending) return pending;
+
+  const p = new Promise((resolve,reject)=>{
     const img = new Image();
-    img.onload = ()=>{ imageCache.set(src,img); resolve(img); };
-    img.onerror = reject;
+    img.onload = ()=>{
+      imageCache.set(src,img);
+      trimImageCache();
+      pendingDecodes.delete(src);
+      resolve(img);
+    };
+    img.onerror = (err)=>{ pendingDecodes.delete(src); reject(err); };
     img.src = src;
+  });
+  pendingDecodes.set(src, p);
+  return p;
+}
+
+// decode শেষে একবারই repaint (rAF দিয়ে coalesced)
+let decodeRepaintScheduled = false;
+function scheduleDecodeRepaint(){
+  if(decodeRepaintScheduled) return;
+  decodeRepaintScheduled = true;
+  requestAnimationFrame(()=>{
+    decodeRepaintScheduled = false;
+    try{ paint(); }catch(e){}
   });
 }
 
-// প্রজেক্ট লোড/রিস্টোরের পর প্রতিটি image object-এর src (base + shape library)
-// আবার decode করে imageCache-এ rebuild করে, যাতে canvas ফাঁকা না থাকে।
+function requestImageDecode(src){
+  if(!src || typeof src !== "string") return;
+  if(imageCache.has(src) || pendingDecodes.has(src)) return;
+  loadImage(src).then(scheduleDecodeRepaint).catch(()=>{});
+}
+
+// একটি নির্দিষ্ট frame-এ যেসব src দরকার
+function frameImageSrcs(index, objects){
+  const out = [];
+  (objects || S.imageObjects || []).forEach(o=>{
+    if(!o || o.hidden) return;
+    try{
+      const sh = resolveActiveShape(o, index);
+      if(sh && sh.src) out.push(sh.src);
+    }catch(e){}
+  });
+  return out;
+}
+
+// export/PNG-এর মতো জায়গায় frame আঁকার আগে দরকারি ছবি decode নিশ্চিত করা
+async function ensureFrameImagesDecoded(index, objects){
+  const srcs = frameImageSrcs(index, objects);
+  await Promise.all(srcs.map(s => loadImage(s).catch(()=>null)));
+}
+
+// playback/timeline: current frame + সামনের কয়েকটি + পিছনের কয়েকটি
+function preloadAroundFrame(index, ahead = 8, behind = 3){
+  const total = (S.layers && S.layers[0]) ? S.layers[0].frames.length : 1;
+  for(let i = index; i <= Math.min(total-1, index+ahead); i++){
+    frameImageSrcs(i).forEach(requestImageDecode);
+  }
+  for(let i = Math.max(0, index-behind); i < index; i++){
+    frameImageSrcs(i).forEach(requestImageDecode);
+  }
+}
+
+// প্রজেক্ট লোড/রিস্টোরের পর সাধারণ ছবির src decode করা হয় (pinned);
+// ভিডিও-ফ্রেম src গুলো lazy — শুধু current frame-এর আশেপাশে decode হবে।
 async function preloadImageObjectSources(objects){
   const srcs = new Set();
   (objects || []).forEach(o => {
-    if(o && typeof o.src === "string" && o.src) srcs.add(o.src);
+    if(o && typeof o.src === "string" && o.src && !evictableSrcs.has(o.src)) srcs.add(o.src);
     (o && Array.isArray(o.shapes) ? o.shapes : []).forEach(sh => {
-      if(sh && typeof sh.src === "string" && sh.src) srcs.add(sh.src);
+      if(sh && typeof sh.src === "string" && sh.src && !evictableSrcs.has(sh.src)) srcs.add(sh.src);
     });
   });
   // broken/অসম্পূর্ণ cache entry বাদ দাও, যাতে নতুন করে decode হয়
@@ -850,8 +984,29 @@ async function preloadImageObjectSources(objects){
     if(c && !c.complete) imageCache.delete(src);
   });
   await Promise.all([...srcs].map(src => loadImage(src).catch(()=>null)));
+  try{ preloadAroundFrame(S.frame || 0); }catch(e){}
 }
 
+
+
+/* Catmull-Rom স্প্লাইন স্যাম্পলিং — anchor point গুলোর মধ্য দিয়ে smooth curve */
+function catmullRomSample(pts, seg=18){
+  if(!pts || pts.length<3) return (pts||[]).slice();
+  const out = [];
+  const P = i => pts[Math.max(0, Math.min(pts.length-1, i))];
+  for(let i=0;i<pts.length-1;i++){
+    const p0=P(i-1), p1=P(i), p2=P(i+1), p3=P(i+2);
+    for(let j=0;j<seg;j++){
+      const t=j/seg, t2=t*t, t3=t2*t;
+      out.push({
+        x: 0.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
+        y: 0.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3)
+      });
+    }
+  }
+  out.push(pts[pts.length-1]);
+  return out;
+}
 
 function pathStroke(ctx,s,sx,sy){
   const p = s.pts;
@@ -876,6 +1031,12 @@ function pathStroke(ctx,s,sx,sy){
       Math.abs(b.y-a.y)*sy*.5,
       0, 0, Math.PI*2
     );
+  }
+  else if(s.tool==="curve"){
+    const sp = catmullRomSample(p);
+    ctx.moveTo(sp[0].x*sx, sp[0].y*sy);
+    if(sp.length===1){ ctx.lineTo(sp[0].x*sx+.01, sp[0].y*sy); }
+    for(let i=1;i<sp.length;i++) ctx.lineTo(sp[i].x*sx, sp[i].y*sy);
   }
   else{
     ctx.moveTo(a.x*sx,a.y*sy);
@@ -977,8 +1138,8 @@ function drawImageObjectsForLayer(ctx, imageObjects, layerId, layerOpacity, fram
     const t = worldTransformAt(o, frame);
     if(!t) return;
     const shape = resolveActiveShape(o, frame);
-    const img = imageCache.get(shape.src);
-    if(!img || !img.complete) return;
+    const img = getDecodedImage(shape.src);
+    if(!img){ requestImageDecode(shape.src); return; }
 
     const pv = pivotOf(o);
     const cx = (t.x + pv.px*t.w)*w;
@@ -1073,16 +1234,16 @@ function drawSelectionBox(ctx, obj, w, h){
   // pivot handle (anchor point) at local origin
   ctx.beginPath();
   ctx.strokeStyle = "#f2ede0";
-  ctx.lineWidth = 1.5;
-  ctx.moveTo(-11, 0); ctx.lineTo(11, 0);
-  ctx.moveTo(0, -11); ctx.lineTo(0, 11);
+  ctx.lineWidth = 1.8;
+  ctx.moveTo(-14, 0); ctx.lineTo(14, 0);
+  ctx.moveTo(0, -14); ctx.lineTo(0, 14);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(0, 0, 6, 0, Math.PI*2);
+  ctx.arc(0, 0, 8, 0, Math.PI*2);
   ctx.fillStyle = "#2b1c0d";
   ctx.fill();
   ctx.strokeStyle = "#f2ede0";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.2;
   ctx.stroke();
 
   ctx.restore();
@@ -1100,6 +1261,7 @@ const S = {
   brushSize: 6,
   brushOpacity: 1,
   eraserSize: 30,
+  stabilizer: 0,
   fps: 12,
   onion: true,
   onionBefore: 1,
@@ -1121,6 +1283,7 @@ let future = [];
 let pointers = new Map();
 let gesture = null;
 let drawing = null;
+let smoothLastPt = null;
 let transformDrag = null;
 let playInterval = null;
 let autosaveTimer = 0;
@@ -1139,7 +1302,7 @@ function ensureFrameCount(n){
 
 function commit(mutator){
   past.push({
-    layers: JSON.parse(JSON.stringify(S.layers)),
+    layers: S.layers,
     imageObjects: cloneImageObjects(S.imageObjects)
   });
   if(past.length>40) past.shift();
@@ -1330,6 +1493,89 @@ async function deleteVideoFrames(objId){
     });
   }catch(e){}
 }
+/* ---------- IndexedDB (ছবির বড় ডেটা — localStorage quota এড়াতে) ---------- */
+const IMAGE_DB_BASE = "frameo-studio-images";
+const IMAGE_STORE = "images";
+let imageDbPromise = null;
+function openImageDb(){
+  if(!currentUserId) return Promise.resolve(null);
+  if(imageDbPromise) return imageDbPromise;
+  const dbName = `${IMAGE_DB_BASE}::${currentUserId}`;
+  imageDbPromise = new Promise((resolve, reject)=>{
+    try{
+      const req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(IMAGE_STORE)) db.createObjectStore(IMAGE_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }catch(e){ reject(e); }
+  }).catch(()=>null);
+  return imageDbPromise;
+}
+
+let lastImageAssetSignature = null;
+function imageAssetSignature(){
+  return S.imageObjects
+    .filter(o=>!o.isVideo)
+    .map(o => o.id + ":" + (o.shapes||[]).map(s=>s.id).join(","))
+    .join("|");
+}
+
+async function saveImageAssets(force){
+  const sig = imageAssetSignature();
+  if(!force && sig === lastImageAssetSignature) return;
+  lastImageAssetSignature = sig;
+  const db = await openImageDb();
+  if(!db) return;
+  try{
+    const payload = {};
+    S.imageObjects.forEach(o => {
+      if(o.isVideo) return; // ভিডিও ফ্রেম আলাদা VIDEO_DB-তে সেভ হয় আগে থেকেই
+      payload[o.id] = o.src;
+      (o.shapes||[]).forEach(s => { payload[`${o.id}::${s.id}`] = s.src; });
+    });
+    await new Promise(resolve => {
+      const tx = db.transaction(IMAGE_STORE, "readwrite");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+      tx.objectStore(IMAGE_STORE).put(payload, "assets");
+    });
+  }catch(e){}
+}
+
+async function loadImageAssets(){
+  const db = await openImageDb();
+  if(!db) return null;
+  return await new Promise(resolve => {
+    try{
+      const req = db.transaction(IMAGE_STORE, "readonly").objectStore(IMAGE_STORE).get("assets");
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    }catch(e){ resolve(null); }
+  });
+}
+
+function hydrateImageObjectSources(objects, assetMap){
+  if(!assetMap) return;
+  (objects||[]).forEach(o=>{
+    if(o.isVideo) return;
+    if(assetMap[o.id]) o.src = assetMap[o.id];
+    (o.shapes||[]).forEach(s=>{
+      const key = `${o.id}::${s.id}`;
+      if(assetMap[key]) s.src = assetMap[key];
+    });
+  });
+}
+
+async function restoreImageAssets(){
+  const assetMap = await loadImageAssets();
+  if(!assetMap) return false;
+  hydrateImageObjectSources(S.imageObjects, assetMap);
+  return true;
+}
 // রিলোডের পর blob URL অকেজো হয়ে যায় — IndexedDB থেকে আবার URL বানিয়ে src ঠিক করা
 async function rehydrateVideoObjects(objects){
   const videoObjs = (objects||[]).filter(o => o && o.isVideo);
@@ -1337,6 +1583,7 @@ async function rehydrateVideoObjects(objects){
     const blobs = await loadVideoFrames(obj.id);
     if(!blobs || !blobs.length) continue;
     const urls = blobs.map(b => URL.createObjectURL(b));
+    markEvictableSrcs(urls);
     obj.src = urls[0];
     obj.shapes = (obj.shapes||[]).map((s, i) => ({ ...s, src: urls[i+1] || s.src }));
   }
@@ -1407,10 +1654,19 @@ function autosaveNow(){
   const key = getAutosaveKey();
   if(key){
     try{
-      localStorage.setItem(key, JSON.stringify(autosaveSnapshot()));
+      const snap = autosaveSnapshot();
+      // বড় base64 ছবি ডেটা localStorage-এ না রেখে IndexedDB-তে সরানো হচ্ছে,
+      // localStorage-এ শুধু হালকা মেটাডেটা থাকবে
+      const lightImageObjects = snap.imageObjects.map(o => o.isVideo ? o : {
+        ...o,
+        src: "",
+        shapes: (o.shapes||[]).map(s => ({ ...s, src: "" }))
+      });
+      localStorage.setItem(key, JSON.stringify({ ...snap, imageObjects: lightImageObjects }));
     }catch(e){}
   }
   saveAudioClips();
+  saveImageAssets();
   /* Saved gallery projects are independent snapshots — never auto-overwritten */
 }
 
@@ -1509,6 +1765,14 @@ function paint(){
     const obj = S.imageObjects.find(o=>o.id===S.selectedObjectId);
     if(obj) drawSelectionBox(ctx2d, obj, w, h);
   }
+
+  if(S.tool==="lasso" && !S.playing && typeof drawLassoOverlay==="function"){
+    drawLassoOverlay(ctx2d);
+  }
+
+  if(S.tool==="curve" && !S.playing && typeof drawCurveOverlay==="function"){
+    drawCurveOverlay(ctx2d);
+  }
 }
 
 try{
@@ -1516,6 +1780,7 @@ try{
 }catch(e){
   console.error("ResizeObserver সাপোর্ট নেই, window resize দিয়ে fallback করা হচ্ছে:", e);
   window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", ()=>{ if(typeof renderLassoBar==="function") renderLassoBar(); if(typeof renderCurveBar==="function") renderCurveBar(); });
 }
 
 function applyViewTransform(){
@@ -1543,6 +1808,7 @@ function startPlayback(){
     }
 
     S.frame = nextFrame;
+    preloadAroundFrame(nextFrame);
     paint();
     updateFrameCounter();
     updateTimelineActive();
@@ -1685,6 +1951,689 @@ function applyDragUpdate(drag, p){
   }
 }
 
+
+/* ===================== Lasso Selection (শুধু Canvas Drawing-এর জন্য) =====================
+   নিয়ম: Lasso কেবল active drawing layer-এর বর্তমান frame-এ হাতে আঁকা stroke নিয়ে কাজ করে।
+   Uploaded Image / Object (imageObjects, tool==="image" stroke) কখনোই স্পর্শ করে না —
+   তাদের জন্য আগের Object Selection system-ই ব্যবহার হবে। */
+
+let lassoPath = null;          // আঁকার সময়কার freehand path (normalized pts)
+let lassoSel = null;           // { ids:Set, layer, frame }
+let lassoDrag = null;
+let lassoClipboard = null;
+let lassoClipboardObjs = null;
+
+function lassoActive(){
+  if(!lassoSel || lassoSel.layer!==S.activeLayer || lassoSel.frame!==S.frame) return false;
+  return !!(lassoSel.ids.size || (lassoSel.objIds && lassoSel.objIds.size));
+}
+
+
+function lassoCurrentStrokes(){
+  const l = S.layers[S.activeLayer];
+  return (l && l.frames[S.frame]) || [];
+}
+
+function lassoWriteStrokes(strokes){
+  S.layers = S.layers.map((l,i) => i===S.activeLayer ? {
+    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? strokes : f)
+  } : l);
+}
+
+function lassoCommitStrokes(strokes){
+  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
+    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? strokes : f)
+  } : l));
+}
+
+function lassoClear(){
+  if(lassoSel){ lassoSel = null; }
+  lassoPath = null;
+  lassoDrag = null;
+  renderLassoBar();
+  paint();
+}
+
+function lassoClosePopup(){
+  lassoSel = null;
+  lassoPath = null;
+  lassoDrag = null;
+  S.tool = "brush";
+  renderAll();
+  paint();
+}
+
+function pointInPoly(pt, poly){
+  let inside = false;
+  for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    if(((yi>pt.y)!==(yj>pt.y)) && (pt.x < (xj-xi)*(pt.y-yi)/((yj-yi)||1e-12) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function lassoSelectedStrokes(){
+  if(!lassoActive()) return [];
+  return lassoCurrentStrokes().filter(s => lassoSel.ids.has(s.id));
+}
+
+/* Bucket Fill দিয়ে বানানো fill (fromBucket) ক্যানভাসে আঁকা রঙ হিসেবেই গণ্য —
+   তাই Lasso এগুলোকেও ধরতে পারে। সাধারণ uploaded image / video কখনোই না। */
+function isLassoObj(o){
+  const l = S.layers[S.activeLayer];
+  return !!(o && o.fromBucket && !o.isVideo && !o.hidden && l && o.layerId===l.id && bucketObjectFrame(o)===S.frame);
+}
+
+function lassoSelectedObjs(){
+  if(!lassoSel || !lassoSel.objIds || lassoSel.layer!==S.activeLayer || lassoSel.frame!==S.frame) return [];
+  return (S.imageObjects||[]).filter(o => lassoSel.objIds.has(o.id) && o.fromBucket && !o.isVideo);
+}
+
+function lassoObjBox(o){
+  const t = objectTransformAt(o, S.frame);
+  if(!t) return null;
+  return { x0: t.x, y0: t.y, x1: t.x + t.w, y1: t.y + t.h };
+}
+
+
+/* Lasso polygon দিয়ে stroke গুলো ভাগ করা হয়:
+   ভিতরের অংশ আলাদা নতুন stroke হয় (selected), বাইরের অংশ অপরিবর্তিত থাকে। */
+function lassoSplitByPolygon(poly){
+  const src = lassoCurrentStrokes();
+  const out = [];
+  const ids = new Set();
+
+  for(const s of src){
+    if(!s || s.tool==="image" || !Array.isArray(s.pts) || !s.pts.length){ out.push(s); continue; }
+
+    if(s.tool==="line" || s.tool==="rect" || s.tool==="ellipse"){
+      const a = s.pts[0], b = s.pts[s.pts.length-1];
+      const c = { x:(a.x+b.x)/2, y:(a.y+b.y)/2 };
+      const whole = pointInPoly(c, poly) && pointInPoly(a, poly) && pointInPoly(b, poly);
+      out.push(s);
+      if(whole) ids.add(s.id);
+      continue;
+    }
+
+    // freehand / eraser: consecutive inside/outside segment এ ভাঙা
+    const segs = [];
+    let cur = { inside: pointInPoly(s.pts[0], poly), pts: [s.pts[0]] };
+    for(let i=1; i<s.pts.length; i++){
+      const inside = pointInPoly(s.pts[i], poly);
+      if(inside===cur.inside){ cur.pts.push(s.pts[i]); }
+      else{
+        segs.push(cur);
+        cur = { inside, pts: [s.pts[i-1], s.pts[i]] };
+      }
+    }
+    segs.push(cur);
+
+    if(segs.length===1){
+      out.push(s);
+      if(segs[0].inside) ids.add(s.id);
+      continue;
+    }
+
+    segs.forEach((seg, i) => {
+      const ns = { ...s, id: i===0 ? s.id : uid(), pts: seg.pts.map(p=>({ x:p.x, y:p.y })) };
+      out.push(ns);
+      if(seg.inside) ids.add(ns.id);
+    });
+  }
+
+  return { strokes: out, ids };
+}
+
+function lassoBBoxNorm(){
+  const sel = lassoSelectedStrokes();
+  const objs = lassoSelectedObjs();
+  if(!sel.length && !objs.length) return null;
+  let x0=1, y0=1, x1=0, y1=0;
+  sel.forEach(s => s.pts.forEach(p => {
+    if(p.x<x0) x0=p.x; if(p.y<y0) y0=p.y;
+    if(p.x>x1) x1=p.x; if(p.y>y1) y1=p.y;
+  }));
+  objs.forEach(o => {
+    const b = lassoObjBox(o);
+    if(!b) return;
+    if(b.x0<x0) x0=b.x0; if(b.y0<y0) y0=b.y0;
+    if(b.x1>x1) x1=b.x1; if(b.y1>y1) y1=b.y1;
+  });
+  return { x0, y0, x1, y1 };
+}
+
+/* Lasso drawing + bucket fill-কে আগে একই full-canvas bitmap-এ composite করে।
+   ফলে একটি global mask-ই outline ও fill-এর একেবারে একই pixels কাটে। */
+function tracePath(ctx, pts, scaleX, scaleY){
+  const sy = scaleY==null ? scaleX : scaleY;
+  ctx.beginPath();
+  pts.forEach((p,i) => { if(i===0) ctx.moveTo(p.x*scaleX, p.y*sy); else ctx.lineTo(p.x*scaleX, p.y*sy); });
+  ctx.closePath();
+}
+
+function alphaBounds(ctx, w, h, minA){
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const th = minA==null ? 8 : minA;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for(let y=0; y<h; y++){
+    for(let x=0; x<w; x++){
+      if(d[(y*w+x)*4+3] > th){
+        if(x<x0) x0=x; if(y<y0) y0=y;
+        if(x>x1) x1=x; if(y>y1) y1=y;
+      }
+    }
+  }
+  if(x1<0) return null;
+  return { x0, y0, x1, y1 };
+}
+
+function cropCanvasToPiece(srcCanvas, box){
+  const bw = box.x1-box.x0+1, bh = box.y1-box.y0+1;
+  const c = document.createElement("canvas");
+  c.width = bw; c.height = bh;
+  c.getContext("2d").drawImage(srcCanvas, box.x0, box.y0, bw, bh, 0, 0, bw, bh);
+  return { canvas: c, w: bw, h: bh };
+}
+
+async function lassoCompositeCut(poly){
+  const W = STAGE_W, H = STAGE_H;
+  const layer = S.layers[S.activeLayer];
+  const bucketObjs = (S.imageObjects||[]).filter(isLassoObj);
+  const composite = document.createElement("canvas");
+  composite.width = W; composite.height = H;
+  const cctx = composite.getContext("2d");
+  if(!layer || !cctx) return null;
+
+  // Render order matches the editor: all drawing strokes, then bucket-fill pixels.
+  drawStrokes(cctx, layer.frames[S.frame] || [], W, H, 1);
+  for(const o of bucketObjs){
+    const t = worldTransformAt(o, S.frame);
+    const shape = resolveActiveShape(o, S.frame);
+    if(!t || !shape) continue;
+    let img;
+    try { img = await loadImage(shape.src); } catch(e){ continue; }
+    const pv = pivotOf(o);
+    const dw = t.w*W, dh = t.h*H;
+    cctx.save();
+    cctx.globalCompositeOperation = "source-over";
+    cctx.globalAlpha = Math.max(0, Math.min(1, t.opacity));
+    cctx.translate((t.x+pv.px*t.w)*W, (t.y+pv.py*t.h)*H);
+    cctx.rotate(t.rotation || 0);
+    cctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
+    cctx.drawImage(img, (t.flipX ? -(1-pv.px) : -pv.px)*dw, (t.flipY ? -(1-pv.py) : -pv.py)*dh, dw, dh);
+    cctx.restore();
+  }
+
+  const makeCanvas = () => { const c=document.createElement("canvas"); c.width=W; c.height=H; return c; };
+  const inside = makeCanvas(), outside = makeCanvas();
+  const ictx = inside.getContext("2d"), octx = outside.getContext("2d");
+  ictx.drawImage(composite,0,0); octx.drawImage(composite,0,0);
+  ictx.globalCompositeOperation = "destination-in";
+  tracePath(ictx, poly, W, H); ictx.fill();
+  octx.globalCompositeOperation = "destination-out";
+  tracePath(octx, poly, W, H); octx.fill();
+  ictx.globalCompositeOperation = octx.globalCompositeOperation = "source-over";
+
+  const inBox = alphaBounds(ictx,W,H,2);
+  if(!inBox) return null;
+  const outBox = alphaBounds(octx,W,H,2);
+  const layerId = layer.id;
+  const makeObj = (srcCanvas, box) => {
+    const piece = cropCanvasToPiece(srcCanvas, box);
+    return {
+      id: uid(), layerId, src: piece.canvas.toDataURL("image/png"), natW: piece.w, natH: piece.h,
+      name: "Lasso Pixels", parentId:null, parentBindFrame:null, group:"", hidden:false,
+      fromBucket:true, bucketFrame:S.frame, shapes:[], shapeKeyframes:[],
+      keyframes:[{ frame:S.frame, x:box.x0/W, y:box.y0/H, w:piece.w/W, h:piece.h/H,
+        rotation:0, opacity:1, flipX:false, flipY:false, easing:"linear" }]
+    };
+  };
+  const insideObj = makeObj(inside,inBox);
+  return {
+    removeIds:new Set(bucketObjs.map(o=>o.id)),
+    outsideObj:outBox ? makeObj(outside,outBox) : null,
+    insideObj
+  };
+}
+
+async function lassoFinishPath(){
+  const path = lassoPath;
+  lassoPath = null;
+  if(!path || path.length < 3){ lassoSel = null; renderLassoBar(); paint(); return; }
+
+  const layer = S.layers[S.activeLayer];
+  if(!layer || !layer.visible){ lassoSel = null; renderLassoBar(); paint(); return; }
+
+  const cut = await lassoCompositeCut(path);
+
+  if(!cut){
+    lassoSel = null;
+    renderLassoBar();
+    paint();
+    return;
+  }
+
+  commit((ls, objs) => {
+    const nextLayers = ls.map((l,i) => i===S.activeLayer ? {
+      ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [] : f)
+    } : l);
+    const nextObjs = objs.filter(o => !cut.removeIds.has(o.id));
+    const pieces = cut.outsideObj ? [cut.outsideObj, cut.insideObj] : [cut.insideObj];
+    return { layers: nextLayers, imageObjects: [...nextObjs, ...pieces] };
+  });
+
+  lassoSel = { ids:new Set(), objIds:new Set([cut.insideObj.id]), layer: S.activeLayer, frame: S.frame };
+  renderLassoBar();
+  renderTimeline();
+  paint();
+}
+
+
+
+/* --------- transform (move / scale / rotate / flip) --------- */
+function lassoApplyTransform(strokeMap, opts){
+  const { cx, cy, dx=0, dy=0, scale=1, rot=0, flipX=false, flipY=false } = opts;
+  const cos = Math.cos(rot), sin = Math.sin(rot);
+  strokeMap.forEach(({ stroke, base }) => {
+    stroke.pts = base.map(p => {
+      let x = (p.x - cx) * (flipX ? -1 : 1) * scale;
+      let y = (p.y - cy) * (flipY ? -1 : 1) * scale;
+      const rx = x*cos - y*sin;
+      const ry = x*sin + y*cos;
+      return { x: cx + rx + dx, y: cy + ry + dy };
+    });
+  });
+}
+
+/* drag শুরুর আগে selected stroke গুলোর fresh clone বসানো হয় (structural sharing নিরাপদ) */
+/* selected bucket-fill object গুলোর mutable clone বানিয়ে base transform ধরে রাখা */
+function lassoCollectObjClones(){
+  const out = [];
+  const objIds = (lassoSel && lassoSel.objIds) || new Set();
+  if(!objIds.size) return out;
+  S.imageObjects = cloneImageObjects(S.imageObjects);
+  S.imageObjects.forEach(o => {
+    if(!objIds.has(o.id)) return;
+    o.keyframes.forEach(k => out.push({ kf: k, base: { ...k } }));
+  });
+  return out;
+}
+
+/* bucket-fill object কে stroke-এর মতোই একই কেন্দ্র ধরে transform করা হয় */
+function lassoApplyObjTransform(objClones, opts){
+  if(!objClones || !objClones.length) return;
+  const { cx, cy, dx=0, dy=0, scale=1, rot=0, flipX=false, flipY=false } = opts;
+  const cos = Math.cos(rot), sin = Math.sin(rot);
+  objClones.forEach(({ kf, base }) => {
+    const bcx = base.x + base.w/2, bcy = base.y + base.h/2;
+    let x = (bcx - cx) * (flipX ? -1 : 1) * scale;
+    let y = (bcy - cy) * (flipY ? -1 : 1) * scale;
+    const ncx = cx + (x*cos - y*sin) + dx;
+    const ncy = cy + (x*sin + y*cos) + dy;
+    const nw = base.w * scale, nh = base.h * scale;
+    kf.x = ncx - nw/2; kf.y = ncy - nh/2;
+    kf.w = nw; kf.h = nh;
+    kf.rotation = (base.rotation || 0) + rot;
+    kf.flipX = flipX ? !base.flipX : !!base.flipX;
+    kf.flipY = flipY ? !base.flipY : !!base.flipY;
+  });
+}
+
+function lassoBeginDrag(mode, pNorm){
+  const box = lassoBBoxNorm();
+  if(!box) return;
+  const preState = { layers: S.layers, imageObjects: cloneImageObjects(S.imageObjects) };
+  const clones = [];
+  const next = lassoCurrentStrokes().map(s => {
+    if(!lassoSel.ids.has(s.id)) return s;
+    const ns = { ...s, pts: s.pts.map(p=>({ x:p.x, y:p.y })) };
+    clones.push({ stroke: ns, base: ns.pts.map(p=>({ x:p.x, y:p.y })) });
+    return ns;
+  });
+  lassoWriteStrokes(next);
+  const objClones = lassoCollectObjClones();
+
+  const cx = (box.x0+box.x1)/2, cy = (box.y0+box.y1)/2;
+  lassoDrag = {
+    mode, preState, clones, objClones, cx, cy, box,
+    start: pNorm,
+    startDist: Math.hypot((pNorm.x-cx)*STAGE_W, (pNorm.y-cy)*STAGE_H) || 1,
+    startAng: Math.atan2(pNorm.y-cy, pNorm.x-cx)
+  };
+}
+
+
+function lassoUpdateDrag(pNorm){
+  const d = lassoDrag;
+  if(!d) return;
+  let opts = null;
+  if(d.mode==="move"){
+    opts = { cx:d.cx, cy:d.cy, dx: pNorm.x-d.start.x, dy: pNorm.y-d.start.y };
+  } else if(d.mode==="scale"){
+    const dist = Math.hypot((pNorm.x-d.cx)*STAGE_W, (pNorm.y-d.cy)*STAGE_H) || 1;
+    opts = { cx:d.cx, cy:d.cy, scale: Math.max(0.05, dist/d.startDist) };
+  } else if(d.mode==="rotate"){
+    const ang = Math.atan2(pNorm.y-d.cy, pNorm.x-d.cx);
+    opts = { cx:d.cx, cy:d.cy, rot: ang-d.startAng };
+  }
+  if(opts){
+    lassoApplyTransform(d.clones, opts);
+    lassoApplyObjTransform(d.objClones, opts);
+  }
+
+  paint();
+}
+
+function lassoEndDrag(){
+  if(!lassoDrag) return;
+  past.push(lassoDrag.preState);
+  if(past.length>40) past.shift();
+  future = [];
+  lassoDrag = null;
+  autosave();
+  renderUndoRedo();
+  renderTimeline();
+  renderLassoBar();
+  paint();
+}
+
+function lassoHitMode(pxPoint){
+  const box = lassoBBoxNorm();
+  if(!box) return null;
+  const w = canvas.width, h = canvas.height;
+  const x0 = box.x0*w, y0 = box.y0*h, x1 = box.x1*w, y1 = box.y1*h;
+  const HR = 26 * (canvas.width/STAGE_W);
+  if(Math.hypot(pxPoint.x-x1, pxPoint.y-y1) <= HR) return "scale";
+  if(Math.hypot(pxPoint.x-(x0+x1)/2, pxPoint.y-(y0-34*(canvas.width/STAGE_W))) <= HR) return "rotate";
+  if(pxPoint.x>=x0-4 && pxPoint.x<=x1+4 && pxPoint.y>=y0-4 && pxPoint.y<=y1+4) return "move";
+  return null;
+}
+
+/* --------- clipboard / delete / flip --------- */
+function lassoCopy(){
+  const sel = lassoSelectedStrokes();
+  const objs = lassoSelectedObjs();
+  if(!sel.length && !objs.length) return;
+  lassoClipboard = sel.map(s => ({ ...s, pts: s.pts.map(p=>({ x:p.x, y:p.y })) }));
+  lassoClipboardObjs = objs.map(o => ({
+    ...o, keyframes: o.keyframes.map(k=>({ ...k })), shapes: (o.shapes||[]).map(s=>({ ...s })),
+    shapeKeyframes: (o.shapeKeyframes||[]).map(k=>({ ...k }))
+  }));
+  renderLassoBar();
+}
+
+function lassoDelete(){
+  if(!lassoActive()) return;
+  const next = lassoCurrentStrokes().filter(s => !lassoSel.ids.has(s.id));
+  const objIds = lassoSel.objIds || new Set();
+  commit((ls, objs) => ({
+    layers: ls.map((l,i) => i===S.activeLayer ? {
+      ...l, frames: l.frames.map((f,fi) => fi===S.frame ? next : f)
+    } : l),
+    imageObjects: objs.filter(o => !objIds.has(o.id))
+  }));
+  lassoSel = null;
+  renderLassoBar();
+  renderTimeline();
+  paint();
+}
+
+function lassoCut(){
+  lassoCopy();
+  lassoDelete();
+}
+
+function lassoPaste(){
+  const hasStrokes = !!(lassoClipboard && lassoClipboard.length);
+  const hasObjs = !!(lassoClipboardObjs && lassoClipboardObjs.length);
+  if(!hasStrokes && !hasObjs) return;
+  const pasted = hasStrokes ? lassoClipboard.map(s => ({
+    ...s, id: uid(), pts: s.pts.map(p=>({ x: Math.min(1, p.x+0.03), y: Math.min(1, p.y+0.03) }))
+  })) : [];
+  const layerId = S.layers[S.activeLayer] ? S.layers[S.activeLayer].id : null;
+  const pastedObjs = hasObjs ? lassoClipboardObjs.map(o => ({
+    ...o, id: uid(), layerId, parentId: null, parentBindFrame: null,
+    keyframes: o.keyframes.map(k => ({ ...k, frame: S.frame, x: Math.min(1, k.x+0.03), y: Math.min(1, k.y+0.03) })),
+    shapes: (o.shapes||[]).map(s=>({ ...s })),
+    shapeKeyframes: (o.shapeKeyframes||[]).map(k=>({ ...k }))
+  })) : [];
+  commit((ls, objs) => ({
+    layers: ls.map((l,i) => i===S.activeLayer ? {
+      ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...(f||[]), ...pasted] : f)
+    } : l),
+    imageObjects: [...objs, ...pastedObjs]
+  }));
+  lassoSel = {
+    ids: new Set(pasted.map(s=>s.id)),
+    objIds: new Set(pastedObjs.map(o=>o.id)),
+    layer: S.activeLayer, frame: S.frame
+  };
+  renderLassoBar();
+  renderTimeline();
+  paint();
+}
+
+function lassoFlip(axis){
+  if(!lassoActive()) return;
+  const box = lassoBBoxNorm();
+  if(!box) return;
+  const cx = (box.x0+box.x1)/2, cy = (box.y0+box.y1)/2;
+  const clones = [];
+  const next = lassoCurrentStrokes().map(s => {
+    if(!lassoSel.ids.has(s.id)) return s;
+    const ns = { ...s, pts: s.pts.map(p=>({ x:p.x, y:p.y })) };
+    clones.push({ stroke: ns, base: ns.pts.map(p=>({ x:p.x, y:p.y })) });
+    return ns;
+  });
+  commit((ls, objs) => ({
+    layers: ls.map((l,i) => i===S.activeLayer ? {
+      ...l, frames: l.frames.map((f,fi) => fi===S.frame ? next : f)
+    } : l),
+    imageObjects: cloneImageObjects(objs)
+  }));
+  const objClones = lassoCollectObjClones();
+  lassoApplyTransform(clones, { cx, cy, flipX: axis==="x", flipY: axis==="y" });
+  lassoApplyObjTransform(objClones, { cx, cy, flipX: axis==="x", flipY: axis==="y" });
+  renderTimeline();
+  paint();
+
+}
+
+/* --------- overlay --------- */
+function drawLassoOverlay(ctx){
+  const w = canvas.width, h = canvas.height;
+  const k = w/STAGE_W;
+  ctx.save();
+  ctx.setLineDash([8*k, 6*k]);
+  ctx.lineWidth = 2*k;
+
+  if(lassoPath && lassoPath.length>1){
+    ctx.strokeStyle = "#4aa8ff";
+    ctx.beginPath();
+    ctx.moveTo(lassoPath[0].x*w, lassoPath[0].y*h);
+    for(let i=1;i<lassoPath.length;i++) ctx.lineTo(lassoPath[i].x*w, lassoPath[i].y*h);
+    ctx.stroke();
+  }
+
+  const box = lassoActive() ? lassoBBoxNorm() : null;
+  if(box){
+    const x0 = box.x0*w, y0 = box.y0*h, x1 = box.x1*w, y1 = box.y1*h;
+    ctx.strokeStyle = "#00f5d4";
+    ctx.strokeRect(x0, y0, x1-x0, y1-y0);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#00f5d4";
+    ctx.beginPath(); ctx.arc(x1, y1, 9*k, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc((x0+x1)/2, y0-34*k, 9*k, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "#00f5d4";
+    ctx.lineWidth = 2*k;
+    ctx.beginPath(); ctx.moveTo((x0+x1)/2, y0); ctx.lineTo((x0+x1)/2, y0-34*k); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* --------- action bar --------- */
+function renderLassoBar(){
+  let bar = document.getElementById("lassoBar");
+  const hasSelection = lassoActive();
+  const hasClipboard = !!((lassoClipboard && lassoClipboard.length) || (lassoClipboardObjs && lassoClipboardObjs.length));
+  const show = S.tool==="lasso" && !S.playing;
+  if(!show){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement("div");
+    bar.id = "lassoBar";
+    bar.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);display:flex;gap:.35rem;padding:.4rem .5rem;border-radius:12px;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-panel);z-index:120;max-width:96vw;overflow-x:auto;";
+    document.body.appendChild(bar);
+  }
+  const rail = document.getElementById('toolRail');
+  if(rail){
+    const r = rail.getBoundingClientRect();
+    bar.style.top = Math.round(r.bottom + 6) + "px";
+  } else {
+    bar.style.top = "50vh";
+  }
+
+  bar.innerHTML = "";
+  const items = [
+    ["📋","Copy", lassoCopy, hasSelection],
+    ["✂️","Cut", lassoCut, hasSelection],
+    ["📥","Paste", lassoPaste, hasClipboard],
+    ["🗑","Delete", lassoDelete, hasSelection],
+    ["⇋","Flip H", ()=>lassoFlip("x"), hasSelection],
+    ["⇵","Flip V", ()=>lassoFlip("y"), hasSelection],
+    ["✕","Close", lassoClosePopup, true]
+  ];
+  items.forEach(([icon,label,fn,enabled])=>{
+    const b = document.createElement("button");
+    b.textContent = icon;
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.style.cssText = `flex:0 0 auto;border:0;border-radius:9px;padding:.3rem .5rem;font-size:.95rem;background:${enabled?"rgba(255,255,255,.14)":"rgba(255,255,255,.05)"};color:#fff;opacity:${enabled?1:.4};`;
+    b.disabled = !enabled;
+    b.onclick = (ev)=>{ ev.stopPropagation(); fn(); };
+    bar.appendChild(b);
+  });
+}
+/* =================== Lasso Selection শেষ =================== */
+
+/* =================== Curve (Bezier / Anchor Point) Tool =================== */
+let curvePts = [];
+let curveDragIdx = null;
+
+function curveActive(){ return curvePts.length > 0; }
+
+function curveClear(){
+  curvePts = [];
+  curveDragIdx = null;
+  renderCurveBar();
+  paint();
+}
+
+function curveHitIndex(px){
+  const w = canvas.width, h = canvas.height;
+  const r = 16 * (w/STAGE_W);
+  for(let i=curvePts.length-1;i>=0;i--){
+    const p = curvePts[i];
+    if(Math.hypot(p.x*w - px.x, p.y*h - px.y) <= r) return i;
+  }
+  return null;
+}
+
+function curveAddPoint(n){
+  curvePts.push({ x:n.x, y:n.y });
+  renderCurveBar();
+  paint();
+}
+
+function curveUndoPoint(){
+  curvePts.pop();
+  renderCurveBar();
+  paint();
+}
+
+function curveStrokeObject(){
+  return {
+    id: uid(), tool: "curve", color: S.color,
+    size: S.brushSize, opacity: S.brushOpacity,
+    pts: curvePts.map(p=>({ x:p.x, y:p.y }))
+  };
+}
+
+function curveConfirm(){
+  if(curvePts.length < 2){ curveClear(); return; }
+  const d = curveStrokeObject();
+  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
+    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, d] : f)
+  } : l));
+  curvePts = [];
+  curveDragIdx = null;
+  renderCurveBar();
+  renderTimeline();
+  paint();
+}
+
+function drawCurveOverlay(ctx){
+  if(!curvePts.length) return;
+  const w = canvas.width, h = canvas.height;
+  const k = w/STAGE_W;
+
+  // লাইভ প্রিভিউ — বর্তমান ব্রাশ কালার/সাইজ/অপাসিটি
+  if(curvePts.length > 1){
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.globalAlpha = S.brushOpacity ?? 1;
+    ctx.strokeStyle = S.color;
+    ctx.lineWidth = (S.brushSize/1000)*w;
+    pathStroke(ctx, { tool:"curve", pts: curvePts }, w, h);
+    ctx.restore();
+  }
+
+  // anchor ডট
+  ctx.save();
+  curvePts.forEach((p,i)=>{
+    ctx.beginPath();
+    ctx.arc(p.x*w, p.y*h, 7*k, 0, Math.PI*2);
+    ctx.fillStyle = (i===curveDragIdx) ? "#00f5d4" : "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 2*k;
+    ctx.strokeStyle = "#4aa8ff";
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function renderCurveBar(){
+  let bar = document.getElementById("curveBar");
+  const show = S.tool==="curve" && !S.playing;
+  if(!show){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement("div");
+    bar.id = "curveBar";
+    bar.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);display:flex;gap:.35rem;padding:.4rem .5rem;border-radius:12px;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-panel);z-index:120;max-width:96vw;overflow-x:auto;";
+    document.body.appendChild(bar);
+  }
+  const rail = document.getElementById("toolRail");
+  bar.style.top = rail ? (Math.round(rail.getBoundingClientRect().bottom + 6) + "px") : "50vh";
+
+  bar.innerHTML = "";
+  const items = [
+    ["↶","Undo last point", curveUndoPoint, curveActive()],
+    ["✕","Cancel", curveClear, curveActive()],
+    ["✓","Confirm", curveConfirm, curvePts.length>1]
+  ];
+  items.forEach(([icon,label,fn,enabled])=>{
+    const b = document.createElement("button");
+    b.textContent = icon;
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.style.cssText = `flex:0 0 auto;border:0;border-radius:9px;padding:.3rem .6rem;font-size:.95rem;background:${enabled?"rgba(255,255,255,.14)":"rgba(255,255,255,.05)"};color:#fff;opacity:${enabled?1:.4};`;
+    b.disabled = !enabled;
+    b.onclick = (ev)=>{ ev.stopPropagation(); fn(); };
+    bar.appendChild(b);
+  });
+}
+/* =================== Curve Tool শেষ =================== */
+
 canvas.addEventListener("pointerdown", e=>{
   e.preventDefault();
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1702,6 +2651,50 @@ canvas.addEventListener("pointerdown", e=>{
   }
 
   if(S.playing) return;
+if(S.tool === "eyedropper"){
+    const p = posFromEvent(e);
+    pickColorAt(p.x, p.y);
+    return;
+  }
+
+if(S.tool === "bucket"){
+    const p = posFromEvent(e);
+    applyBucketFillAt(p.x, p.y).catch(err => {
+      console.error("Bucket fill ব্যর্থ:", err);
+      alert("ফিল করা যায়নি: " + (err && err.message ? err.message : String(err)));
+    });
+    return;
+  }
+
+  if(S.tool === "lasso"){
+    const px = pxFromEvent(e);
+    canvas.setPointerCapture(e.pointerId);
+    const mode = lassoActive() ? lassoHitMode(px) : null;
+    if(mode){
+      lassoBeginDrag(mode, posFromEvent(e));
+    } else {
+      lassoSel = null;
+      lassoPath = [posFromEvent(e)];
+      renderLassoBar();
+    }
+    paint();
+    return;
+  }
+
+
+
+  if(S.tool === "curve"){
+    canvas.setPointerCapture(e.pointerId);
+    const px = pxFromEvent(e);
+    const hit = curveHitIndex(px);
+    if(hit !== null){
+      curveDragIdx = hit;
+      paint();
+    } else {
+      curveAddPoint(posFromEvent(e));
+    }
+    return;
+  }
 
   if(S.tool === "select"){
     const p = pxFromEvent(e);
@@ -1770,6 +2763,7 @@ canvas.addEventListener("pointerdown", e=>{
     id: uid(), tool: S.tool, color: S.color, size: currentSize, opacity: currentOpacity,
     pts: [posFromEvent(e)]
   };
+  smoothLastPt = drawing.pts[0];
 
   paint();
 }, { passive: false });
@@ -1804,14 +2798,40 @@ canvas.addEventListener("pointermove", e=>{
     return;
   }
 
+  if(curveDragIdx !== null){
+    const n = posFromEvent(e);
+    curvePts[curveDragIdx] = { x:n.x, y:n.y };
+    paint();
+    return;
+  }
+
+  if(lassoDrag){ lassoUpdateDrag(posFromEvent(e)); return; }
+  if(lassoPath){ lassoPath.push(posFromEvent(e)); paint(); return; }
+
   if(!drawing) return;
-  drawing.pts.push(posFromEvent(e));
+  const rawPt = posFromEvent(e);
+  if((drawing.tool==="brush" || drawing.tool==="eraser") && S.stabilizer > 0){
+    const alpha = Math.max(0.04, 1 - S.stabilizer);
+    const sp = {
+      x: smoothLastPt.x + (rawPt.x - smoothLastPt.x)*alpha,
+      y: smoothLastPt.y + (rawPt.y - smoothLastPt.y)*alpha
+    };
+    smoothLastPt = sp;
+    drawing.pts.push(sp);
+  } else {
+    drawing.pts.push(rawPt);
+  }
   paint();
 }, { passive: false });
 
 function onPointerUp(e){
   pointers.delete(e.pointerId);
   if(pointers.size < 2) gesture = null;
+
+  if(curveDragIdx !== null){ curveDragIdx = null; paint(); return; }
+
+  if(lassoDrag){ lassoEndDrag(); return; }
+  if(lassoPath){ lassoFinishPath(); return; }
 
   if(transformDrag){
     past.push(transformDrag.preState);
@@ -1828,6 +2848,10 @@ function onPointerUp(e){
   const d = drawing;
   drawing = null;
   if(!d) return;
+
+  if((d.tool==="brush" || d.tool==="eraser") && S.stabilizer > 0){
+    d.pts.push(posFromEvent(e));
+  }
 
   commit(ls => ls.map((l,i) => i===S.activeLayer ? {
     ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, d] : f)
@@ -1863,11 +2887,21 @@ function addFrame(){
 
 function duplicateFrame(){
   const f = S.frame;
-  mutateFrames(frames => [
-    ...frames.slice(0, f+1),
-    (frames[f]||[]).map(s => ({ ...s, id: uid() })),
-    ...frames.slice(f+1)
-  ]);
+  commit((ls, objs) => {
+    const duplicateBuckets = [];
+    const layers = ls.map(l => {
+      bucketObjectsForLayerFrame(l.id, f).forEach(o => duplicateBuckets.push(cloneBucketObject(o, f+1, l.id)));
+      return {
+        ...l,
+        frames: [
+          ...l.frames.slice(0, f+1),
+          (l.frames[f]||[]).map(s => ({ ...s, id: uid(), pts: (s.pts||[]).map(p=>({ ...p })) })),
+          ...l.frames.slice(f+1)
+        ]
+      };
+    });
+    return { layers, imageObjects: [...objs, ...duplicateBuckets] };
+  });
   S.frame = f+1;
   renderAll();
 }
@@ -1890,9 +2924,11 @@ function copyCurrentFrame(){
   const activeL = S.layers[S.activeLayer];
   if(!activeL) return;
   const currentStrokes = activeL.frames[S.frame] || [];
-  if(!currentStrokes.length){ alert("কপি করার মতো কিছু নেই!"); return; }
+  const currentBuckets = bucketObjectsForLayerFrame(activeL.id, S.frame);
+  if(!currentStrokes.length && !currentBuckets.length){ alert("কপি করার মতো কিছু নেই!"); return; }
   clipboardStrokes = JSON.parse(JSON.stringify(currentStrokes));
-  alert("ড্রয়িং কপি করা হয়েছে!");
+  clipboardBucketObjects = currentBuckets.map(o => cloneBucketObject(o, S.frame, activeL.id));
+  alert("ড্রয়িং ও রং কপি করা হয়েছে!");
 }
 
 function pasteToCurrentFrame(){
@@ -1919,11 +2955,23 @@ function pasteToCurrentFrame(){
     return;
   }
 
-  if(!clipboardStrokes || !clipboardStrokes.length){ alert("কপি করার মতো কিছু নেই!"); return; }
-  const pasted = clipboardStrokes.map(s => ({ ...s, id: uid() }));
-  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
-    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, ...pasted] : f)
-  } : l));
+  const hasStrokes = !!(clipboardStrokes && clipboardStrokes.length);
+  const hasBuckets = !!(clipboardBucketObjects && clipboardBucketObjects.length);
+  if(!hasStrokes && !hasBuckets){ alert("কপি করার মতো কিছু নেই!"); return; }
+  const activeL = S.layers[S.activeLayer];
+  if(!activeL) return;
+  const pasted = hasStrokes ? clipboardStrokes.map(s => ({
+    ...s, id: uid(), pts: (s.pts||[]).map(p=>({ ...p }))
+  })) : [];
+  const pastedBuckets = hasBuckets
+    ? clipboardBucketObjects.map(o => cloneBucketObject(o, S.frame, activeL.id))
+    : [];
+  commit((ls, objs) => ({
+    layers: ls.map((l,i) => i===S.activeLayer ? {
+      ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, ...pasted] : f)
+    } : l),
+    imageObjects: [...objs, ...pastedBuckets]
+  }));
   renderAll();
 }
 
@@ -1953,9 +3001,15 @@ function clearFrame(){
     return;
   }
 
-  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
-    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [] : f)
-  } : l));
+  const activeL = S.layers[S.activeLayer];
+  if(!activeL) return;
+  const bucketIds = new Set(bucketObjectsForLayerFrame(activeL.id, S.frame).map(o=>o.id));
+  commit((ls, objs) => ({
+    layers: ls.map((l,i) => i===S.activeLayer ? {
+      ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [] : f)
+    } : l),
+    imageObjects: objs.filter(o => !bucketIds.has(o.id))
+  }));
   renderAll();
 }
 
@@ -2207,7 +3261,176 @@ async function processImportedImage(file){
 
   return { src, natW: img.naturalWidth, natH: img.naturalHeight };
 }
+function hexToRgb(hex){
+  const v = hex.replace("#","");
+  const full = v.length===3 ? v.split("").map(c=>c+c).join("") : v;
+  const n = parseInt(full, 16);
+  return [(n>>16)&255, (n>>8)&255, n&255];
+}
 
+function colorMatch(data, idx, target, tol){
+  return Math.abs(data[idx]-target[0])<=tol &&
+         Math.abs(data[idx+1]-target[1])<=tol &&
+         Math.abs(data[idx+2]-target[2])<=tol &&
+         Math.abs(data[idx+3]-target[3])<=tol;
+}
+
+// ---------- Eyedropper (কালার পিকার) ----------
+function toHex2(n){ return Math.max(0, Math.min(255, n|0)).toString(16).padStart(2, "0"); }
+
+// ক্যানভাসের বর্তমান ফ্রেমে ভিজ্যুয়ালি যা দেখা যাচ্ছে (bg + সব লেয়ার + ছবি)
+// সেটাই কম্পোজিট করে nx,ny পজিশনের পিক্সেল রং তোলে। transparent হলে null।
+function samplePixelHex(nx, ny){
+  const w = STAGE_W, h = STAGE_H;
+  const off = document.createElement("canvas");
+  off.width = w; off.height = h;
+  const octx = off.getContext("2d");
+  renderFrame(octx, S.layers, S.imageObjects, S.frame, w, h, S.bg);
+  const x = Math.max(0, Math.min(w-1, Math.round(nx*w)));
+  const y = Math.max(0, Math.min(h-1, Math.round(ny*h)));
+  let d;
+  try{ d = octx.getImageData(x, y, 1, 1).data; }catch(e){ return null; }
+  if(d[3] < 8) return null; // transparent — কিছুই হবে না
+  return "#" + toHex2(d[0]) + toHex2(d[1]) + toHex2(d[2]);
+}
+
+function applyPickedColor(hex){
+  if(!hex) return false;
+  S.color = hex;
+  S.tool = "brush";
+  showColorPickerDropdown = false;
+  renderAll();
+  return true;
+}
+
+function pickColorAt(nx, ny){
+  const hex = samplePixelHex(nx, ny);
+  if(!hex) return false;               // transparent: আগের রংই থাকবে
+  return applyPickedColor(hex);
+}
+
+async function startEyedropper(){
+  if(typeof window !== "undefined" && window.EyeDropper){
+    try{
+      const res = await new window.EyeDropper().open();
+      if(res && res.sRGBHex){ applyPickedColor(res.sRGBHex); return; }
+    }catch(e){ /* ইউজার ক্যান্সেল করলে কিছু না */ return; }
+  }
+  // ফলব্যাক: ক্যানভাসে ট্যাপ করে রং তোলার মোড
+  S.tool = "eyedropper";
+  showColorPickerDropdown = false;
+  showSettingsDropdown = false;
+  renderAll();
+}
+
+
+// nx, ny = normalized (0..1) ক্লিক পজিশন, S.color দিয়ে বন্ধ জায়গা ফিল করে
+// একটা { src, x, y, w, h } রিটার্ন করে (fractional bounding box), না পারলে null
+function bucketFillAtPoint(nx, ny){
+  const w = STAGE_W, h = STAGE_H;
+  const off = document.createElement("canvas");
+  off.width = w; off.height = h;
+  const octx = off.getContext("2d");
+  renderFrame(octx, S.layers, S.imageObjects, S.frame, w, h, S.bg);
+
+  let imgData;
+  try{ imgData = octx.getImageData(0,0,w,h); }catch(e){ return null; }
+  const data = imgData.data;
+
+  const startX = Math.max(0, Math.min(w-1, Math.round(nx*w)));
+  const startY = Math.max(0, Math.min(h-1, Math.round(ny*h)));
+  const startIdx = (startY*w+startX)*4;
+  const target = [data[startIdx], data[startIdx+1], data[startIdx+2], data[startIdx+3]];
+
+  const fillCol = hexToRgb(S.color);
+  if(colorMatch(data, startIdx, [fillCol[0],fillCol[1],fillCol[2],255], 4)) return null;
+
+  const TOL = 60; // আগে ছিল 24 — অ্যান্টি-অ্যালিয়াস কিনারা ধরার জন্য বাড়ানো হলো
+  const visited = new Uint8Array(w*h);
+  let mask = new Uint8Array(w*h);
+  const stack = [[startX,startY]];
+  let minX=startX, maxX=startX, minY=startY, maxY=startY;
+  let count = 0;
+  const MAX_PIXELS = w*h;
+
+  while(stack.length){
+    const [x,y] = stack.pop();
+    if(x<0||x>=w||y<0||y>=h) continue;
+    const p = y*w+x;
+    if(visited[p]) continue;
+    visited[p] = 1;
+    const idx = p*4;
+    if(!colorMatch(data, idx, target, TOL)) continue;
+    mask[p] = 1;
+    count++;
+    if(count>MAX_PIXELS) break;
+    if(x<minX)minX=x; if(x>maxX)maxX=x;
+    if(y<minY)minY=y; if(y>maxY)maxY=y;
+    stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+  }
+
+  if(count===0) return null;
+
+  // --- Dilate: মাস্কটাকে ২ পিক্সেল ফুলিয়ে দাও, যাতে লাইনের কিনারার
+  // অ্যান্টি-অ্যালিয়াস গ্রেডিয়েন্ট-জোনটাও ফিলের নিচে ঢাকা পড়ে যায় ---
+  const DILATE = 2;
+  for(let pass=0; pass<DILATE; pass++){
+    const next = new Uint8Array(mask);
+    for(let y=Math.max(0,minY-1); y<=Math.min(h-1,maxY+1); y++){
+      for(let x=Math.max(0,minX-1); x<=Math.min(w-1,maxX+1); x++){
+        const p = y*w+x;
+        if(mask[p]) continue;
+        const up = y>0 ? mask[p-w] : 0;
+        const down = y<h-1 ? mask[p+w] : 0;
+        const left = x>0 ? mask[p-1] : 0;
+        const right = x<w-1 ? mask[p+1] : 0;
+        if(up||down||left||right) next[p] = 1;
+      }
+    }
+    mask = next;
+    minX = Math.max(0, minX-1); maxX = Math.min(w-1, maxX+1);
+    minY = Math.max(0, minY-1); maxY = Math.min(h-1, maxY+1);
+  }
+
+  const bw = maxX-minX+1, bh = maxY-minY+1;
+  const maskCanvas = document.createElement("canvas");
+  maskCanvas.width = bw; maskCanvas.height = bh;
+  const mctx = maskCanvas.getContext("2d");
+  const outImg = mctx.createImageData(bw,bh);
+  for(let y=0;y<bh;y++){
+    for(let x=0;x<bw;x++){
+      const p = (y+minY)*w + (x+minX);
+      const oi = (y*bw+x)*4;
+      if(mask[p]){
+        outImg.data[oi]=fillCol[0];
+        outImg.data[oi+1]=fillCol[1];
+        outImg.data[oi+2]=fillCol[2];
+        outImg.data[oi+3]=255;
+      }
+    }
+  }
+  mctx.putImageData(outImg,0,0);
+
+  return { src: maskCanvas.toDataURL("image/png"), x: minX/w, y: minY/h, w: bw/w, h: bh/h };
+}
+
+async function applyBucketFillAt(nx, ny){
+  const result = bucketFillAtPoint(nx, ny);
+  if(!result) return;
+  const img = await loadImage(result.src);
+  const objId = uid();
+  const newObj = {
+    id: objId,
+    layerId: S.layers[S.activeLayer].id,
+    src: result.src, natW: img.naturalWidth, natH: img.naturalHeight,
+    parentId: null, parentBindFrame: null, group: "", hidden: false, fromBucket: true, bucketFrame: S.frame,
+    pivotX: 0.5, pivotY: 0.5,
+    shapes: [], shapeKeyframes: [],
+    keyframes: [ { frame: S.frame, x: result.x, y: result.y, w: result.w, h: result.h, rotation: 0, opacity: 1, flipX: false, flipY: false, easing: "linear" } ]
+  };
+  commit((ls, objs) => ({ imageObjects: [...objs, newObj] }));
+  renderAll();
+}
 async function importPhoto(file){
   if(!file) return;
   const { src, natW, natH } = await processImportedImage(file);
@@ -2219,8 +3442,13 @@ async function importPhoto(file){
   if(ar > stageAr) h = stageAr/ar;
   else w = ar/stageAr;
 
+  // ছবি স্টেজ ভরে না ফেলে একটু ছোট করে বসবে (৬০%), যাতে সহজে মুভ/রিসাইজ করা যায়
+  const FIT = 0.6;
+  w *= FIT; h *= FIT;
+
   const x = (1-w)/2;
   const y = (1-h)/2;
+
 
   const objId = uid();
   const newObj = {
@@ -2325,7 +3553,10 @@ async function importVideoFile(file){
 
   const { blobs, vw, vh, totalFrames } = result;
   const urls = blobs.map(b => URL.createObjectURL(b));
-  await Promise.all(urls.map(u => loadImage(u).catch(()=>null)));
+  // সব frame একসাথে RAM-এ decode করা হয় না — শুধু প্রথম কয়েকটি,
+  // বাকিগুলো দরকার হলে blob থেকে lazy decode হবে (LRU cache)
+  markEvictableSrcs(urls);
+  await Promise.all(urls.slice(0, 8).map(u => loadImage(u).catch(()=>null)));
 
   const ar = vw/vh;
   const stageAr = STAGE_W/STAGE_H;
@@ -2723,18 +3954,43 @@ function removeLayer(i){
   renderAll();
 }
 
-function exportPng(){
+async function exportPng(transparent){
+  await ensureFrameImagesDecoded(S.frame);
   const off = document.createElement("canvas");
   off.width = STAGE_W;
   off.height = STAGE_H;
   const ctx = off.getContext("2d");
   if(!ctx) return;
 
-  renderFrame(ctx, S.layers, S.imageObjects, S.frame, STAGE_W, STAGE_H, S.bg);
+  if(transparent){
+    // ব্যাকগ্রাউন্ড ফিল না করে সরাসরি লেয়ার/ইমেজ অবজেক্ট আঁকা
+    ctx.clearRect(0, 0, STAGE_W, STAGE_H);
+    const objs = S.imageObjects || [];
+    S.layers.forEach((l, li) => {
+      if(!l.visible) return;
+      const strokes = l.frames[S.frame] || [];
+      const octx = scratchCtx(STAGE_W, STAGE_H);
+      if(!octx){
+        drawStrokes(ctx, strokes, STAGE_W, STAGE_H, l.opacity);
+      } else {
+        drawStrokes(octx, strokes, STAGE_W, STAGE_H, 1);
+        ctx.save();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = l.opacity;
+        ctx.drawImage(octx.canvas, 0, 0);
+        ctx.restore();
+      }
+      drawImageObjectsForLayer(ctx, objs, l.id, l.opacity, S.frame, STAGE_W, STAGE_H);
+    });
+  } else {
+    renderFrame(ctx, S.layers, S.imageObjects, S.frame, STAGE_W, STAGE_H, S.bg);
+  }
 
   const a = document.createElement("a");
   a.href = off.toDataURL("image/png");
-  a.download = `youtube-frame-${S.frame+1}.png`;
+  a.download = transparent
+    ? `youtube-frame-${S.frame+1}-transparent.png`
+    : `youtube-frame-${S.frame+1}.png`;
   a.click();
 }
 
@@ -2838,6 +4094,7 @@ async function exportVideoMp4WebCodecs(scale){
   try{
     const total = frameCount();
     for(let i=0; i<total; i++){
+      await ensureFrameImagesDecoded(i);
       renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
       const frame = new VideoFrame(off, {
         timestamp: Math.round(i*1e6/fps),
@@ -2965,6 +4222,7 @@ async function exportVideoRecorder(scale){
   }
 
   for(let i=0; i<frameCount(); i++){
+    await ensureFrameImagesDecoded(i);
     renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
     showExportOverlay(`MP4 রেন্ডার হচ্ছে ${i+1}/${frameCount()}`);
     await new Promise(r => setTimeout(r, Math.max(1000/S.fps, 40)));
@@ -3026,6 +4284,7 @@ async function exportVideoMp4Wasm(scale){
 
     const total = frameCount();
     for(let i=0;i<total;i++){
+      await ensureFrameImagesDecoded(i);
       renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
       const data = ctx.getImageData(0, 0, enc.width, enc.height).data;
       enc.addFrameRgba(data);
@@ -3212,6 +4471,141 @@ function renderToolRail(){
   }
   rail.classList.remove("tool-rail--shapes");
 
+  // ---- কালার বাটন + ড্রপডাউন: এখন ফিক্সড, নড়বে না ----
+  function buildColorWrap(){
+    const wrap = el("div", "tool-item");
+
+    const colorBtn = el("button", "icon-btn");
+    colorBtn.style.width = "1.8rem";
+    colorBtn.style.height = "1.8rem";
+    colorBtn.style.background = S.color;
+    colorBtn.setAttribute("aria-label", "Color Palette");
+    colorBtn.onclick = (e) => {
+      e.stopPropagation();
+      showColorPickerDropdown = !showColorPickerDropdown;
+      showSettingsDropdown = false;
+      renderToolRail();
+    };
+    wrap.appendChild(colorBtn);
+
+    const dropdown = el("div", `color-picker-dropdown${showColorPickerDropdown ? "" : " hidden"}`);
+    const row = el("div", "swatch-row");
+    PALETTE.forEach(c => {
+      const sw = el("button", `swatch${S.color===c ? " swatch-on" : ""}`);
+      sw.style.background = c;
+      sw.onclick = () => { S.color = c; showColorPickerDropdown = false; renderToolRail(); renderAll(); };
+      row.appendChild(sw);
+    });
+    dropdown.appendChild(row);
+
+    // --- কাস্টম কালার পিকার: ভিজ্যুয়াল স্কয়ার + হিউ স্লাইডার ---
+    const customWrap = document.createElement("div");
+    customWrap.style.cssText = "margin-top:.3rem;padding-top:.5rem;border-top:1px solid var(--border);";
+    customWrap.onclick = (e) => e.stopPropagation();
+
+    const customTitle = el("span", "label", "কাস্টম রঙ");
+    customTitle.style.cssText = "font-size:.6rem;";
+    customWrap.appendChild(customTitle);
+
+    function rgbToHsv(r,g,b){
+      r/=255; g/=255; b/=255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+      let h=0;
+      if(d!==0){
+        if(max===r) h=((g-b)/d)%6;
+        else if(max===g) h=(b-r)/d+2;
+        else h=(r-g)/d+4;
+        h*=60; if(h<0) h+=360;
+      }
+      const s = max===0 ? 0 : d/max;
+      return { h, s, v: max };
+    }
+    function hsvToRgb(h,s,v){
+      const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+      let r=0,g=0,b=0;
+      if(h<60){r=c;g=x;b=0;} else if(h<120){r=x;g=c;b=0;}
+      else if(h<180){r=0;g=c;b=x;} else if(h<240){r=0;g=x;b=c;}
+      else if(h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+      return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+    }
+
+    const startRgb = /^#[0-9a-f]{6}$/i.test(S.color) ? hexToRgb(S.color) : [0,0,0];
+    let hsv = rgbToHsv(...startRgb);
+
+    const preview = document.createElement("div");
+    preview.style.cssText = "width:100%;height:1.6rem;border-radius:6px;border:1px solid var(--border);margin-top:.4rem;";
+    preview.style.background = S.color;
+    customWrap.appendChild(preview);
+
+    const svBox = document.createElement("div");
+    svBox.style.cssText = "position:relative;width:100%;height:110px;border-radius:8px;margin-top:.5rem;touch-action:none;overflow:hidden;";
+    const svWhite = document.createElement("div");
+    svWhite.style.cssText = "position:absolute;inset:0;background:linear-gradient(to right, #fff, transparent);";
+    const svBlack = document.createElement("div");
+    svBlack.style.cssText = "position:absolute;inset:0;background:linear-gradient(to top, #000, transparent);";
+    const svCursor = document.createElement("div");
+    svCursor.style.cssText = "position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.5);transform:translate(-50%,-50%);pointer-events:none;";
+    svBox.appendChild(svWhite);
+    svBox.appendChild(svBlack);
+    svBox.appendChild(svCursor);
+    customWrap.appendChild(svBox);
+
+    const hueBox = document.createElement("div");
+    hueBox.style.cssText = "position:relative;width:100%;height:24px;border-radius:8px;margin-top:.5rem;touch-action:none;background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);";
+    const hueCursor = document.createElement("div");
+    hueCursor.style.cssText = "position:absolute;top:-2px;width:6px;height:28px;border-radius:3px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.5);transform:translateX(-50%);pointer-events:none;";
+    hueBox.appendChild(hueCursor);
+    customWrap.appendChild(hueBox);
+
+    function updateFromHsv(){
+      svBox.style.background = `hsl(${hsv.h},100%,50%)`;
+      svCursor.style.left = (hsv.s*100) + "%";
+      svCursor.style.top = ((1-hsv.v)*100) + "%";
+      hueCursor.style.left = (hsv.h/360*100) + "%";
+      const rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
+      const hex = "#" + rgb.map(v=>v.toString(16).padStart(2,"0")).join("");
+      S.color = hex;
+      preview.style.background = hex;
+    }
+    updateFromHsv();
+
+    function bindDrag(node, onMove){
+      const handle = (e) => {
+        const r = node.getBoundingClientRect();
+        const x = Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
+        const y = Math.max(0, Math.min(1, (e.clientY-r.top)/r.height));
+        onMove(x, y);
+        paint();
+      };
+      node.addEventListener("pointerdown", e => {
+        e.stopPropagation();
+        e.preventDefault();
+        node.setPointerCapture(e.pointerId);
+        handle(e);
+        const onMove2 = ev => { ev.preventDefault(); ev.stopPropagation(); handle(ev); };
+        const onUp = (ev) => {
+          if(ev){ ev.stopPropagation(); }
+          node.removeEventListener("pointermove", onMove2);
+          node.removeEventListener("pointerup", onUp);
+          node.removeEventListener("pointercancel", onUp);
+          renderToolRail();
+        };
+        node.addEventListener("pointermove", onMove2);
+        node.addEventListener("pointerup", onUp);
+        node.addEventListener("pointercancel", onUp);
+      });
+    }
+
+    bindDrag(svBox, (x,y) => { hsv.s = x; hsv.v = 1-y; updateFromHsv(); });
+    bindDrag(hueBox, (x) => { hsv.h = x*360; updateFromHsv(); });
+
+    dropdown.appendChild(customWrap);
+    // --- কাস্টম কালার পিকার শেষ ---
+
+    wrap.appendChild(dropdown);
+    return wrap;
+  }
+
   TOOLS.forEach(t => {
     if(t.id === "settings") {
       const settingsWrap = el("div", "tool-item");
@@ -3227,49 +4621,75 @@ function renderToolRail(){
 
       const settingsDropdown = el("div", `color-picker-dropdown${showSettingsDropdown ? "" : " hidden"}`);
       settingsDropdown.style.width = "210px";
-  settingsDropdown.onclick = (e) => e.stopPropagation();    settingsDropdown.appendChild(buildDrawPanelContents());
+      settingsDropdown.onclick = (e) => e.stopPropagation();
+      settingsDropdown.appendChild(buildDrawPanelContents());
       settingsWrap.appendChild(settingsDropdown);
       rail.appendChild(settingsWrap);
+      return;
     }
-    else if(t.id === "brush") {
-      const wrap = el("div", "tool-item");
-      const b = el("button", `icon-btn${S.tool===t.id ? " icon-btn-accent" : ""}`, t.icon);
-      b.setAttribute("aria-label", t.label);
-      b.onclick = () => { S.tool = t.id; showColorPickerDropdown = false; renderAll(); };
-      wrap.appendChild(b);
 
-      const colorBtn = el("button", "icon-btn");
-      colorBtn.style.width = "1.8rem";
-      colorBtn.style.height = "1.8rem";
-      colorBtn.style.marginLeft = "0.2rem";
-      colorBtn.style.background = S.color;
-      colorBtn.setAttribute("aria-label", "Color Palette");
-      colorBtn.onclick = (e) => {
-        e.stopPropagation();
-        showColorPickerDropdown = !showColorPickerDropdown;
-        showSettingsDropdown = false;
-        renderToolRail();
-      };
-      wrap.appendChild(colorBtn);
-
-      const dropdown = el("div", `color-picker-dropdown${showColorPickerDropdown ? "" : " hidden"}`);
-      const row = el("div", "swatch-row");
-      PALETTE.forEach(c => {
-        const sw = el("button", `swatch${S.color===c ? " swatch-on" : ""}`);
-        sw.style.background = c;
-        sw.onclick = () => { S.color = c; showColorPickerDropdown = false; renderToolRail(); renderAll(); };
-        row.appendChild(sw);
-      });
-      dropdown.appendChild(row);
-
-      wrap.appendChild(dropdown);
-      rail.appendChild(wrap);
-    } else {
-      const b = el("button", `icon-btn${S.tool===t.id ? " icon-btn-accent" : ""}`, t.icon);
-      b.setAttribute("aria-label", t.label);
-      b.onclick = () => { S.tool = t.id; showColorPickerDropdown = false; showSettingsDropdown = false; renderAll(); };
-      rail.appendChild(b);
+    // bucket আইকনের ঠিক আগে (বাম পাশে) কালার বাটনটা একবারই বসানো হচ্ছে
+    if(t.id === "bucket"){
+      rail.appendChild(buildColorWrap());
     }
+
+    const b = el("button", `icon-btn${S.tool===t.id ? " icon-btn-accent" : ""}`, t.icon);
+    b.setAttribute("aria-label", t.label);
+    b.onclick = () => {
+  if(t.id === "eyedropper"){ startEyedropper(); return; }
+  if(t.id === "lasso" && S.tool === "lasso"){
+    lassoSel = null;
+    lassoPath = null;
+    lassoDrag = null;
+    S.tool = "brush";
+    showColorPickerDropdown = false;
+    showSettingsDropdown = false;
+    renderAll();
+    return;
+  }
+  if(t.id === "curve" && S.tool === "curve"){
+    curvePts = [];
+    curveDragIdx = null;
+    S.tool = "brush";
+    showColorPickerDropdown = false;
+    showSettingsDropdown = false;
+    renderAll();
+    return;
+  }
+  if(S.tool === "lasso" && t.id !== "lasso"){
+    lassoSel = null;
+    lassoPath = null;
+    lassoDrag = null;
+  }
+  if(S.tool === "curve" && t.id !== "curve"){
+    curvePts = [];
+    curveDragIdx = null;
+  }
+  S.tool = t.id; showColorPickerDropdown = false; showSettingsDropdown = false; renderAll();
+};
+    rail.appendChild(b);
+  });
+
+  requestAnimationFrame(() => floatToolRailDropdowns());
+}
+function floatToolRailDropdowns(){
+  const rail = document.getElementById("toolRail");
+  if(!rail) return;
+  rail.querySelectorAll(".color-picker-dropdown:not(.hidden)").forEach(dd => {
+    const anchor = dd.parentElement && dd.parentElement.querySelector("button");
+    if(!anchor) return;
+    const r = anchor.getBoundingClientRect();
+    const w = dd.offsetWidth || 180;
+    let left = r.left + r.width/2 - w/2;
+    left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+    dd.style.position = "fixed";
+    dd.style.transform = "none";
+    dd.style.margin = "0";
+    dd.style.left = left + "px";
+    dd.style.top = (r.bottom + 6) + "px";
+    dd.style.maxHeight = (window.innerHeight - r.bottom - 20) + "px";
+    dd.style.overflowY = "auto";
+    dd.style.zIndex = "300";
   });
 }
 
@@ -3848,9 +5268,21 @@ function buildDrawPanelContents(){
     container.appendChild(opField);
   }
 
+  const stabField = el("div", "field");
+  stabField.appendChild(el("div", "label", `Stabilizer ${Math.round((S.stabilizer||0)*100)}%`));
+
+  const stabRange = el("input");
+  stabRange.type = "range";
+  stabRange.min = 0;
+  stabRange.max = 95;
+  stabRange.value = Math.round((S.stabilizer||0)*100);
+  stabRange.oninput = e => { S.stabilizer = Number(e.target.value)/100; autosave(); };
+  stabField.appendChild(stabRange);
+  stabField.appendChild(attachStepper(stabRange));
+  container.appendChild(stabField);
+
   return container;
 }
-
 function renderAllObjectsPanel(){
   // বর্তমান প্রজেক্টের layer-এ নেই এমন leftover object থাকলে ছেঁটে ফেলা হয়
   const validLayerIds = new Set(S.layers.map(l=>l.id));
@@ -4393,6 +5825,8 @@ function renderObjectPanel(){
 
 function renderAll(){
   renderToolRail();
+  if(typeof renderLassoBar==="function") renderLassoBar();
+  if(typeof renderCurveBar==="function") renderCurveBar();
   renderUndoRedo();
   renderPlayButton();
   updateFrameCounter();
@@ -4539,7 +5973,7 @@ document.addEventListener("click", () => {
 document.getElementById("b4k").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(2); };
 document.getElementById("b1080").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(1); };
 document.getElementById("bpng").onclick = () => { exportDropdown.classList.add("hidden"); exportPng(); };
-
+document.getElementById("bpngTransparent").onclick = () => { exportDropdown.classList.add("hidden"); exportPng(true); };
 document.getElementById("btnImportGallery").onclick = () => { document.getElementById("photoInput").click(); };
 
 document.getElementById("photoInput").addEventListener("change", e => {
@@ -4998,14 +6432,59 @@ preloadImageObjectSources(S.imageObjects).then(()=>{ renderAll(); paint(); }).ca
 requestAnimationFrame(resizeCanvas);
 window.addEventListener("resize", resizeCanvas);
 
+// লাসো/কার্ভ পপআপ ওপেন থাকলে ক্যানভাস/টুলবারের বাইরে ফাঁকা জায়গায় ট্যাপ করলে বন্ধ করবে
+document.addEventListener("pointerdown", (e) => {
+  const target = e.target;
+  if (S.playing) return;
+
+  // লাসো টুল বন্ধ করা
+  if (S.tool === "lasso") {
+    const bar = document.getElementById("lassoBar");
+    if (bar && bar.style.display !== "none") {
+      if (bar.contains(target)) return;
+      if (target.closest("#toolRail")) return;
+      if (target === canvas || canvas.contains(target) || target.closest(".stage-wrap")) return;
+      lassoClosePopup();
+    }
+    return;
+  }
+
+  // কার্ভ টুল বন্ধ করা
+  if (S.tool === "curve") {
+    const bar = document.getElementById("curveBar");
+    if (bar) {
+      if (bar.contains(target)) return;
+      if (target.closest("#toolRail")) return;
+      if (target === canvas || canvas.contains(target) || target.closest(".stage-wrap")) return;
+      curveClear();
+      S.tool = "brush";
+      renderAll();
+    }
+  }
+}, true);
+
 // ট্যাব বন্ধ/লুকানোর আগে সাথে সাথে সেভ
 window.addEventListener("beforeunload", autosaveNow);
 window.addEventListener("pagehide", autosaveNow);
 document.addEventListener("visibilitychange", () => { if(document.hidden) autosaveNow(); });
 
 
+/* dev/debug hook — frame memory ও undo/redo পরিমাপের জন্য (read-only) */
+window.__frameoPerf = {
+  S,
+  imageCache, evictableSrcs,
+  get cacheSize(){ return imageCache.size; },
+  get cacheLimit(){ return DECODED_CACHE_LIMIT; },
+  getDecodedImage, markEvictableSrcs, requestImageDecode,
+  preloadAroundFrame, ensureFrameImagesDecoded, setDecodedCacheLimit,
+  commit, undo, redo, paint, renderAll, frameCount, ensureFrameCount,
+  get pastLength(){ return past.length; },
+  get lassoSelection(){ return lassoSel ? { size: lassoSel.ids.size, ids: [...lassoSel.ids], layer: lassoSel.layer, frame: lassoSel.frame } : null; },
+  lassoSelectedStrokes
+};
+
 })();
 </script>
 
 </body>
-  </html>
+</html>
