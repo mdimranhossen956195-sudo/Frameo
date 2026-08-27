@@ -69,9 +69,9 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .quick-shape-thumb{flex:0 0 auto;width:2.6rem;height:2.6rem;padding:2px;}
 .quick-shape-thumb img{width:100%;height:100%;object-fit:contain;border-radius:6px;background:rgba(255,255,255,.85);}
 
-.transport{display:flex;align-items:center;justify-content:space-between;gap:.3rem;padding:.4rem .5rem;flex-wrap:nowrap;width:100%;} 
-.transport-left{display:flex;align-items:center;gap:.25rem;flex-shrink:0;}
-.transport-right{display:flex;align-items:center;gap:.25rem;flex-shrink:0;flex-wrap:nowrap;}
+.transport{display:flex;align-items:center;justify-content:center;gap:.4rem;padding:.4rem .5rem;flex-wrap:wrap;width:100%;}
+.transport-left{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap;justify-content:center;}
+.transport-right{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap;justify-content:center;}
 .transport-panel{padding:.5rem .6rem;}
 .frame-counter{font-size:.7rem;color:var(--muted-foreground);white-space:nowrap;margin:0 .2rem;font-variant-numeric:tabular-nums;min-width:3.6em;display:inline-block;}
 .frame-counter span{color:var(--foreground);}
@@ -195,14 +195,14 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 .gallery-empty{color:var(--muted-foreground);font-size:.8rem;padding:2rem 0;text-align:center;}
 
 @media(max-width:420px){
-  .icon-btn{width:1.75rem;height:1.75rem;font-size:.68rem;}
-  .transport{gap:.15rem;padding:.3rem .3rem;}
-  .transport-left{gap:.12rem;min-width:0;flex-shrink:1;}
-  .transport-right{gap:.12rem;min-width:0;flex-shrink:1;}
-  .frame-counter{min-width:2.6em;margin:0 .05rem;font-size:.6rem;}
-  .transport .chip{padding:.16rem .22rem !important;font-size:.52rem !important;white-space:nowrap;}
-  .transport #easingTopSelect{padding:.16rem .05rem !important;font-size:.52rem !important;}
-  .panel.transport-panel{padding:.3rem .35rem;}
+  .icon-btn{width:1.65rem;height:1.65rem;font-size:.64rem;}
+.transport{gap:.3rem;padding:.3rem .25rem;}
+.transport-left{gap:.25rem;}
+.transport-right{gap:.25rem;}
+  .frame-counter{min-width:3.2em;width:3.2em;margin:0 .05rem;font-size:.58rem;text-align:center;}
+.transport .chip{padding:.28rem .32rem !important;font-size:.55rem !important;white-space:nowrap;}
+   .transport #easingTopSelect{padding:.16rem .05rem !important;font-size:.52rem !important;}
+   .panel.transport-panel{padding:.3rem .3rem;}
 }
 
 </style>
@@ -317,29 +317,30 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
           <div class="tool-item" id="easingTopWrap" style="display:none;">
   <select id="easingTopSelect" class="chip" style="padding: 0.2rem 0.1rem; font-size: 0.6rem; appearance:none; -webkit-appearance:none; -moz-appearance:none; text-align:center; text-align-last:center;"></select>
 </div>
-          <div class="tool-item" style="display:inline-flex;"> 
-            <button id="btnFpsToggle" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">FPS: 12</button>
-            <div id="fpsDropdown" class="color-picker-dropdown hidden" style="width: 170px;">
-              <div class="field" style="margin:0;">
-                <div class="label" id="fpsLabel">Rate: 12 fps</div>
-                <input type="range" id="fpsRange" min="2" max="60" value="12" style="width:100%; margin-top:4px;" />
-                <div class="stepper-row" id="fpsStepperRow"></div>
-              </div>
-            </div>
-          </div>
-          <div class="tool-item" style="display:inline-flex;">
-            <button id="btnOnion" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">Onion</button>
-            <div id="onionDropdown" class="color-picker-dropdown hidden" style="width: 190px;">
-              <div class="field" style="margin:0;">
-                <button id="btnOnionToggle" class="chip w-full" style="margin-bottom:.5rem;">Onion: ON</button>
-                <div class="label">Before frames: <span id="onionBeforeLabel">1</span></div>
-                <div class="stepper-row" id="onionBeforeStepperRow"></div>
-                <div class="label" style="margin-top:.5rem;">After frames: <span id="onionAfterLabel">1</span></div>
-                <div class="stepper-row" id="onionAfterStepperRow"></div>
-              </div>
-            </div>
-          </div>
-          <button id="btnLoop" class="chip" style="padding: 0.2rem 0.35rem; font-size: 0.6rem;">Loop</button>
+          <button id="btnFitZoom" class="chip chip-xs">Fit</button>
+<div class="tool-item">
+  <button id="btnFpsToggle" class="chip chip-xs">FPS: 12</button>
+  <div id="fpsDropdown" class="color-picker-dropdown hidden" style="width: 170px;">
+    <div class="field" style="margin:0;">
+      <div class="label" id="fpsLabel">Rate: 12 fps</div>
+      <input type="range" id="fpsRange" min="2" max="60" value="12" style="width:100%; margin-top:4px;" />
+      <div class="stepper-row" id="fpsStepperRow"></div>
+    </div>
+  </div>
+</div>
+<div class="tool-item">
+  <button id="btnOnion" class="chip chip-xs">Onion</button>
+  <div id="onionDropdown" class="color-picker-dropdown hidden" style="width: 190px;">
+    <div class="field" style="margin:0;">
+      <button id="btnOnionToggle" class="chip w-full" style="margin-bottom:.5rem;">Onion: ON</button>
+      <div class="label">Before frames: <span id="onionBeforeLabel">1</span></div>
+      <div class="stepper-row" id="onionBeforeStepperRow"></div>
+      <div class="label" style="margin-top:.5rem;">After frames: <span id="onionAfterLabel">1</span></div>
+      <div class="stepper-row" id="onionAfterStepperRow"></div>
+    </div>
+  </div>
+</div>
+<button id="btnLoop" class="chip chip-xs">Loop</button>
         </div>
       </div>
 
@@ -356,7 +357,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
   </div>
 
   <div class="scroll-area">
-    <div class="panel">
+      <div class="panel timeline-panel">
       <div class="xsheet-wrap" id="xsheetWrap">
         <div class="xsheet-table" id="timelineStrip"></div>
       </div>
@@ -1285,7 +1286,9 @@ let gesture = null;
 let drawing = null;
 let smoothLastPt = null;
 let transformDrag = null;
-let playInterval = null;
+let playRafId = null;
+let playClockStart = 0;
+let playClockStartFrame = 0;
 let autosaveTimer = 0;
 const exportState = { active: false };
 
@@ -1789,34 +1792,56 @@ function applyViewTransform(){
 }
 
 function startPlayback(){
-  clearInterval(playInterval);
-  const interval = 1000 / S.fps;
+  stopPlayback();
+  playClockStart = performance.now();
+  playClockStartFrame = S.frame;
 
-  playInterval = setInterval(() => {
-    if(!S.playing) { clearInterval(playInterval); return; }
+  function loopFn(){
+    if(!S.playing) return;
 
-    let nextFrame = S.frame + 1;
-    if(nextFrame >= frameCount()){
+    const elapsedSec = (performance.now() - playClockStart) / 1000;
+    const framesElapsed = Math.floor(elapsedSec * S.fps);
+    let nextFrame = playClockStartFrame + framesElapsed;
+    const total = frameCount();
+
+    if(nextFrame >= total){
       if(!S.loop){
+        if(S.frame !== total - 1){
+          S.frame = total - 1;
+          paint();
+          updateFrameCounter();
+          updateTimelineActive();
+        }
         S.playing = false;
-        clearInterval(playInterval);
+        stopAudioPlayback();
         renderPlayButton();
         return;
       }
-      nextFrame = 0;
-      startAudioPlaybackFromFrame(0);
+      nextFrame = total > 0 ? (nextFrame % total) : 0;
+      playClockStartFrame = 0;
+      playClockStart = performance.now() - (nextFrame / S.fps) * 1000;
+      startAudioPlaybackFromFrame(nextFrame);
     }
 
-    S.frame = nextFrame;
-    preloadAroundFrame(nextFrame);
-    paint();
-    updateFrameCounter();
-    updateTimelineActive();
-  }, interval);
+    if(nextFrame !== S.frame){
+      S.frame = nextFrame;
+      preloadAroundFrame(nextFrame);
+      paint();
+      updateFrameCounter();
+      updateTimelineActive();
+    }
+
+    playRafId = requestAnimationFrame(loopFn);
+  }
+
+  playRafId = requestAnimationFrame(loopFn);
 }
 
 function stopPlayback(){
-  clearInterval(playInterval);
+  if(playRafId){
+    cancelAnimationFrame(playRafId);
+    playRafId = null;
+  }
 }
 
 function posFromEvent(e){
@@ -2021,12 +2046,15 @@ function lassoSelectedStrokes(){
    তাই Lasso এগুলোকেও ধরতে পারে। সাধারণ uploaded image / video কখনোই না। */
 function isLassoObj(o){
   const l = S.layers[S.activeLayer];
-  return !!(o && o.fromBucket && !o.isVideo && !o.hidden && l && o.layerId===l.id && bucketObjectFrame(o)===S.frame);
+  if(!o || o.isVideo || o.hidden || !l || o.layerId!==l.id) return false;
+  if(o.id === S.selectedObjectId) return false;              // selected object সুরক্ষিত
+  if(o.fromBucket) return bucketObjectFrame(o)===S.frame;
+  return !!worldTransformAt(o, S.frame);                     // imported / converted সব object
 }
 
 function lassoSelectedObjs(){
   if(!lassoSel || !lassoSel.objIds || lassoSel.layer!==S.activeLayer || lassoSel.frame!==S.frame) return [];
-  return (S.imageObjects||[]).filter(o => lassoSel.objIds.has(o.id) && o.fromBucket && !o.isVideo);
+  return (S.imageObjects||[]).filter(o => lassoSel.objIds.has(o.id) && !o.isVideo);
 }
 
 function lassoObjBox(o){
@@ -2561,14 +2589,10 @@ function curveStrokeObject(){
 function curveConfirm(){
   if(curvePts.length < 2){ curveClear(); return; }
   const d = curveStrokeObject();
-  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
-    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, d] : f)
-  } : l));
   curvePts = [];
   curveDragIdx = null;
   renderCurveBar();
-  renderTimeline();
-  paint();
+  commitStrokeWithBake(d).catch(err => console.error("curve bake ব্যর্থ:", err));
 }
 
 function drawCurveOverlay(ctx){
@@ -2633,6 +2657,183 @@ function renderCurveBar(){
   });
 }
 /* =================== Curve Tool শেষ =================== */
+/* ===================== FlipaClip-style Raster Bake =====================
+   Deselected object-এর bounding area-তে আঁকা/মুছা সরাসরি সেই object-এর
+   bitmap-এ merge হয়ে যায়। Selected object সম্পূর্ণ সুরক্ষিত থাকে। */
+
+function bakeObjWorldGeom(o, t){
+  const W = STAGE_W, H = STAGE_H;
+  const pv = pivotOf(o);
+  const dw = t.w*W, dh = t.h*H;
+  const cx = (t.x + pv.px*t.w)*W;
+  const cy = (t.y + pv.py*t.h)*H;
+  const ox = (t.flipX ? -(1-pv.px) : -pv.px)*dw;
+  const oy = (t.flipY ? -(1-pv.py) : -pv.py)*dh;
+  return { W, H, pv, dw, dh, cx, cy, ox, oy, rot: t.rotation || 0,
+           fx: t.flipX ? -1 : 1, fy: t.flipY ? -1 : 1 };
+}
+
+function bakeObjAABB(o, t){
+  const g = bakeObjWorldGeom(o, t);
+  const cos = Math.cos(g.rot), sin = Math.sin(g.rot);
+  const corners = [
+    [g.ox, g.oy], [g.ox+g.dw, g.oy], [g.ox, g.oy+g.dh], [g.ox+g.dw, g.oy+g.dh]
+  ];
+  let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+  for(const [u,v] of corners){
+    const px = u*g.fx, py = v*g.fy;
+    const X = g.cx + px*cos - py*sin;
+    const Y = g.cy + px*sin + py*cos;
+    if(X<x0)x0=X; if(Y<y0)y0=Y; if(X>x1)x1=X; if(Y>y1)y1=Y;
+  }
+  return { x0, y0, x1, y1 };
+}
+
+/* এই মুহূর্তে যেসব object-এ bake করা যাবে (selected টা বাদ) */
+function bakeTargets(){
+  const l = S.layers[S.activeLayer];
+  if(!l || !l.visible) return [];
+  const lassoIds = (lassoSel && lassoSel.objIds) || null;
+  return (S.imageObjects || []).filter(o =>
+    o && !o.isVideo && !o.hidden && o.layerId === l.id &&
+    o.id !== S.selectedObjectId &&
+    !(lassoIds && lassoIds.has(o.id)) &&
+    !!worldTransformAt(o, S.frame)
+  );
+}
+
+function bakeInvalidateSrc(src){
+  if(!src) return;
+  imageCache.delete(src);
+  pendingDecodes.delete(src);
+  evictableSrcs.delete(src);
+}
+
+/* drawFn(ctx) — canvas-px (STAGE_W×STAGE_H) স্পেসে আঁকে; ভেতরে
+   object-এর world transform-এর inverse বসানো থাকে। */
+async function bakeDrawIntoObjects(bbox, drawFn){
+  const updates = new Map();
+  const targets = bakeTargets();
+  if(!targets.length) return updates;
+
+  for(const o of targets){
+    const t = worldTransformAt(o, S.frame);
+    if(!t) continue;
+    const box = bakeObjAABB(o, t);
+    if(bbox && (bbox.x1 < box.x0 || bbox.x0 > box.x1 || bbox.y1 < box.y0 || bbox.y0 > box.y1)) continue;
+
+    const shape = resolveActiveShape(o, S.frame);
+    let img;
+    try { img = await loadImage(shape.src); } catch(e){ continue; }
+
+    const natW = Math.max(1, shape.natW || img.naturalWidth || 1);
+    const natH = Math.max(1, shape.natH || img.naturalHeight || 1);
+    const c = document.createElement("canvas");
+    c.width = natW; c.height = natH;
+    const ctx = c.getContext("2d");
+    if(!ctx) continue;
+    ctx.drawImage(img, 0, 0, natW, natH);
+
+    const g = bakeObjWorldGeom(o, t);
+    if(g.dw < 1e-6 || g.dh < 1e-6) continue;
+
+    ctx.save();
+    ctx.scale(natW/g.dw, natH/g.dh);
+    ctx.translate(-g.ox, -g.oy);
+    ctx.scale(g.fx, g.fy);
+    ctx.rotate(-g.rot);
+    ctx.translate(-g.cx, -g.cy);
+    try { drawFn(ctx, o); } catch(e){ /* একটি object ব্যর্থ হলে বাকিগুলো চলবে */ }
+    ctx.restore();
+
+    const nextSrc = c.toDataURL("image/png");
+    if(nextSrc === shape.src) continue;
+    bakeInvalidateSrc(shape.src);
+    try { await loadImage(nextSrc); } catch(e){}
+    updates.set(o.id, { shapeId: shape.id, src: nextSrc, natW, natH });
+  }
+  return updates;
+}
+
+function applyBakeUpdates(objs, updates){
+  if(!updates || !updates.size) return objs;
+  return objs.map(o => {
+    const u = updates.get(o.id);
+    if(!u) return o;
+    if(!u.shapeId || u.shapeId === "base"){
+      return { ...o, src: u.src, natW: u.natW, natH: u.natH };
+    }
+    return {
+      ...o,
+      shapes: (o.shapes || []).map(s => s.id === u.shapeId ? { ...s, src: u.src, natW: u.natW, natH: u.natH } : s)
+    };
+  });
+}
+
+function strokeWorldBBox(s){
+  const W = STAGE_W, H = STAGE_H;
+  const pts = (s.tool === "curve" && s.pts && s.pts.length >= 3) ? catmullRomSample(s.pts) : (s.pts || []);
+  if(!pts.length) return null;
+  let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+  const use = (s.tool==="line" || s.tool==="rect" || s.tool==="ellipse") ? [pts[0], pts[pts.length-1]] : pts;
+  for(const p of use){
+    const X = p.x*W, Y = p.y*H;
+    if(X<x0)x0=X; if(Y<y0)y0=Y; if(X>x1)x1=X; if(Y>y1)y1=Y;
+  }
+  const pad = ((s.size||1)/1000)*W + 2;
+  return { x0:x0-pad, y0:y0-pad, x1:x1+pad, y1:y1+pad };
+}
+
+/* Brush / Eraser / Line / Rect / Ellipse / Curve → deselected object-এর bitmap-এ merge */
+async function bakeStrokeUpdates(s){
+  if(!s || !s.pts || !s.pts.length) return new Map();
+  const W = STAGE_W, H = STAGE_H;
+  const isEraser = s.tool === "eraser";
+  const bbox = strokeWorldBBox(s);
+  return bakeDrawIntoObjects(bbox, (ctx)=>{
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
+    ctx.globalAlpha = isEraser ? 1 : (s.opacity ?? 1);
+    ctx.strokeStyle = isEraser ? "#000" : s.color;
+    ctx.lineWidth = ((s.size||1)/1000)*W;
+    pathStroke(ctx, s, W, H);
+  });
+}
+
+/* stroke commit + bake একসাথে (একটাই undo step) */
+async function commitStrokeWithBake(d){
+  let updates = new Map();
+  try { updates = await bakeStrokeUpdates(d); } catch(e){ console.error("bake ব্যর্থ:", e); }
+  commit((ls, objs) => ({
+    layers: ls.map((l,i) => i===S.activeLayer ? {
+      ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, d] : f)
+    } : l),
+    imageObjects: applyBakeUpdates(objs, updates)
+  }));
+  renderTimeline();
+  paint();
+}
+
+/* Bucket fill পয়েন্ট কোন deselected object-এর ভেতরে পড়ছে? */
+function bakeObjectAtPoint(nx, ny){
+  const W = STAGE_W, H = STAGE_H;
+  const px = nx*W, py = ny*H;
+  const targets = bakeTargets();
+  for(let i=targets.length-1; i>=0; i--){
+    const o = targets[i];
+    const t = worldTransformAt(o, S.frame);
+    if(!t) continue;
+    const g = bakeObjWorldGeom(o, t);
+    const cos = Math.cos(-g.rot), sin = Math.sin(-g.rot);
+    const dx = px - g.cx, dy = py - g.cy;
+    const rx = (dx*cos - dy*sin) * g.fx;
+    const ry = (dx*sin + dy*cos) * g.fy;
+    if(rx >= g.ox && rx <= g.ox+g.dw && ry >= g.oy && ry <= g.oy+g.dh) return o;
+  }
+  return null;
+}
+
 
 canvas.addEventListener("pointerdown", e=>{
   e.preventDefault();
@@ -2853,12 +3054,7 @@ function onPointerUp(e){
     d.pts.push(posFromEvent(e));
   }
 
-  commit(ls => ls.map((l,i) => i===S.activeLayer ? {
-    ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [...f, d] : f)
-  } : l));
-
-  renderTimeline();
-  paint();
+  commitStrokeWithBake(d).catch(err => console.error("stroke bake ব্যর্থ:", err));
 }
 
 canvas.addEventListener("pointerup", onPointerUp);
@@ -3418,6 +3614,25 @@ async function applyBucketFillAt(nx, ny){
   const result = bucketFillAtPoint(nx, ny);
   if(!result) return;
   const img = await loadImage(result.src);
+
+  // deselected object-এর ভেতরে ফিল করলে নতুন object নয় — bitmap-এ merge
+  const hostObj = bakeObjectAtPoint(nx, ny);
+  if(hostObj){
+    const W = STAGE_W, H = STAGE_H;
+    const bbox = { x0: result.x*W, y0: result.y*H, x1: (result.x+result.w)*W, y1: (result.y+result.h)*H };
+    const updates = await bakeDrawIntoObjects(bbox, (ctx, o)=>{
+      if(o.id !== hostObj.id) return;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+      ctx.drawImage(img, result.x*W, result.y*H, result.w*W, result.h*H);
+    });
+    if(updates.size){
+      commit((ls, objs) => ({ imageObjects: applyBakeUpdates(objs, updates) }));
+      renderAll();
+      return;
+    }
+  }
+
   const objId = uid();
   const newObj = {
     id: objId,
@@ -3429,6 +3644,73 @@ async function applyBucketFillAt(nx, ny){
     keyframes: [ { frame: S.frame, x: result.x, y: result.y, w: result.w, h: result.h, rotation: 0, opacity: 1, flipX: false, flipY: false, easing: "linear" } ]
   };
   commit((ls, objs) => ({ imageObjects: [...objs, newObj] }));
+  renderAll();
+}
+async function convertFrameContentToObject(){
+  const activeL = S.layers[S.activeLayer];
+  if(!activeL) return;
+
+  const strokes = activeL.frames[S.frame] || [];
+  const bucketObjs = bucketObjectsForLayerFrame(activeL.id, S.frame);
+  if(!strokes.length && !bucketObjs.length) return;
+
+  const W = STAGE_W, H = STAGE_H;
+  const composite = document.createElement("canvas");
+  composite.width = W; composite.height = H;
+  const cctx = composite.getContext("2d");
+  if(!cctx) return;
+
+  drawStrokes(cctx, strokes, W, H, 1);
+
+  for(const o of bucketObjs){
+    const t = worldTransformAt(o, S.frame);
+    const shape = resolveActiveShape(o, S.frame);
+    if(!t || !shape) continue;
+    let img;
+    try { img = await loadImage(shape.src); } catch(e){ continue; }
+    const pv = pivotOf(o);
+    const dw = t.w*W, dh = t.h*H;
+    cctx.save();
+    cctx.globalCompositeOperation = "source-over";
+    cctx.globalAlpha = Math.max(0, Math.min(1, t.opacity));
+    cctx.translate((t.x+pv.px*t.w)*W, (t.y+pv.py*t.h)*H);
+    cctx.rotate(t.rotation || 0);
+    cctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
+    cctx.drawImage(img, (t.flipX ? -(1-pv.px) : -pv.px)*dw, (t.flipY ? -(1-pv.py) : -pv.py)*dh, dw, dh);
+    cctx.restore();
+  }
+
+  const box = alphaBounds(cctx, W, H, 2);
+  if(!box) return;
+
+  const piece = cropCanvasToPiece(composite, box);
+  const objId = uid();
+  const newObj = {
+    id: objId,
+    layerId: activeL.id,
+    src: piece.canvas.toDataURL("image/png"),
+    natW: piece.w, natH: piece.h,
+    parentId: null, parentBindFrame: null, group: "", hidden: false,
+    pivotX: 0.5, pivotY: 0.5,
+    shapes: [], shapeKeyframes: [],
+    keyframes: [{
+      frame: S.frame,
+      x: box.x0/W, y: box.y0/H, w: piece.w/W, h: piece.h/H,
+      rotation: 0, opacity: 1, flipX: false, flipY: false, easing: "linear"
+    }]
+  };
+
+  const bucketIds = new Set(bucketObjs.map(o=>o.id));
+  commit((ls, objs) => ({
+    layers: ls.map((l,i) => i===S.activeLayer ? {
+      ...l, frames: l.frames.map((f,fi) => fi===S.frame ? [] : f)
+    } : l),
+    imageObjects: [...objs.filter(o => !bucketIds.has(o.id)), newObj]
+  }));
+
+  focusLayer();
+  S.selectedObjectId = objId;
+  S.tool = "select";
   renderAll();
 }
 async function importPhoto(file){
@@ -4636,38 +4918,43 @@ function renderToolRail(){
     const b = el("button", `icon-btn${S.tool===t.id ? " icon-btn-accent" : ""}`, t.icon);
     b.setAttribute("aria-label", t.label);
     b.onclick = () => {
+    if(t.id === "select" && S.tool !== "select"){
+    const activeL = S.layers[S.activeLayer];
+    const hasStrokes = activeL && (activeL.frames[S.frame]||[]).length>0;
+    const hasBucket = bucketObjectsForLayerFrame(activeL ? activeL.id : null, S.frame).length>0;
+    if(hasStrokes || hasBucket){
+      convertFrameContentToObject().catch(err => {
+        console.error("Convert ব্যর্থ:", err);
+        alert("সমস্যা হয়েছে: " + (err && err.message ? err.message : String(err)));
+      });
+      return;
+    }
+  }
+  
   if(t.id === "eyedropper"){ startEyedropper(); return; }
   if(t.id === "lasso" && S.tool === "lasso"){
-    lassoSel = null;
-    lassoPath = null;
-    lassoDrag = null;
+    lassoSel = null; lassoPath = null; lassoDrag = null;
     S.tool = "brush";
-    showColorPickerDropdown = false;
-    showSettingsDropdown = false;
+    showColorPickerDropdown = false; showSettingsDropdown = false;
     renderAll();
     return;
   }
   if(t.id === "curve" && S.tool === "curve"){
-    curvePts = [];
-    curveDragIdx = null;
+    curvePts = []; curveDragIdx = null;
     S.tool = "brush";
-    showColorPickerDropdown = false;
-    showSettingsDropdown = false;
+    showColorPickerDropdown = false; showSettingsDropdown = false;
     renderAll();
     return;
   }
   if(S.tool === "lasso" && t.id !== "lasso"){
-    lassoSel = null;
-    lassoPath = null;
-    lassoDrag = null;
+    lassoSel = null; lassoPath = null; lassoDrag = null;
   }
   if(S.tool === "curve" && t.id !== "curve"){
-    curvePts = [];
-    curveDragIdx = null;
+    curvePts = []; curveDragIdx = null;
   }
   S.tool = t.id; showColorPickerDropdown = false; showSettingsDropdown = false; renderAll();
 };
-    rail.appendChild(b);
+rail.appendChild(b);
   });
 
   requestAnimationFrame(() => floatToolRailDropdowns());
@@ -4715,24 +5002,29 @@ function updateFrameCounter(){
   document.getElementById("frameTotal").textContent = String(frameCount());
 }
 
+let _tlActiveEls = { colhead: null, cells: [] };
+
 function updateTimelineActive(){
   const table = document.getElementById("timelineStrip");
   if(!table) return;
 
-  table.querySelectorAll(".xsheet-colhead").forEach(h => {
-    h.classList.toggle("current", Number(h.dataset.frame)===S.frame);
+  // আগের ফ্রেমের হাইলাইট শুধু সরানো হচ্ছে (পুরো টেবিল স্ক্যান না করে)
+  if(_tlActiveEls.colhead) _tlActiveEls.colhead.classList.remove("current");
+  _tlActiveEls.cells.forEach(c => c.classList.remove("current-frame", "active-cell"));
+
+  const colhead = table.querySelector(`.xsheet-colhead[data-frame="${S.frame}"]`);
+  if(colhead) colhead.classList.add("current");
+
+  const newCells = [];
+  table.querySelectorAll(`.xsheet-cell[data-frame="${S.frame}"]`).forEach(c => {
+    c.classList.add("current-frame");
+    if(Number(c.dataset.layer)===S.activeLayer && S.focus !== 'audio'){
+      c.classList.add("active-cell");
+    }
+    newCells.push(c);
   });
 
-  table.querySelectorAll(".xsheet-cell").forEach(c => {
-    const f = Number(c.dataset.frame);
-    const li = Number(c.dataset.layer);
-    c.classList.toggle("current-frame", f===S.frame);
-    c.classList.toggle("active-cell", f===S.frame && li===S.activeLayer && S.focus !== 'audio');
-  });
-
-  table.querySelectorAll(".xsheet-rowhead").forEach(rh => {
-    rh.classList.toggle("active", Number(rh.dataset.layer)===S.activeLayer && S.focus !== 'audio');
-  });
+  _tlActiveEls = { colhead, cells: newCells };
 
   const ph = table.querySelector(".audio-playhead");
   if(ph){
@@ -4793,11 +5085,11 @@ function renderTimeline(){
   row1.appendChild(nameInput);
 
   const upBtn = el("button", "chip compact-btn", "↑");
-  upBtn.onclick = () => { moveLayer(li, -1); renderTimeline(); };
+  upBtn.onclick = () => { moveLayer(li, 1); renderTimeline(); };
   row1.appendChild(upBtn);
 
   const downBtn = el("button", "chip compact-btn", "↓");
-  downBtn.onclick = () => { moveLayer(li, 1); renderTimeline(); };
+  downBtn.onclick = () => { moveLayer(li, -1); renderTimeline(); };
   row1.appendChild(downBtn);
 
   const delBtn = el("button", "chip compact-btn chip-danger", "✕");
@@ -5523,12 +5815,38 @@ function renderObjectPanel(){
   }
 
   const header = document.createElement("div");
-  header.style.cssText = "display:flex;align-items:center;gap:.4rem;";
-  header.appendChild(el("div", "label", "IMAGE OBJECT · " + (function(){
-    const lo = S.layers.find(l=>l.id===obj.layerId);
-    return lo ? lo.name : "";
-  })()));
-  const delObjBtn = el("button", "chip chip-danger compact-btn ml-auto", "Delete Object");
+  header.style.cssText = "display:flex;align-items:center;justify-content:center;gap:.4rem;flex-wrap:wrap;";
+
+  const pivotReset = el("button", "chip compact-btn", " PIVOT রিসেট");
+  pivotReset.onclick = () => {
+    const startKfs = obj.keyframes.map(k=>({ ...k }));
+    applyPivotChange(obj, startKfs, pivotOf(obj), { px:0.5, py:0.5 });
+    autosave();
+    renderObjectPanel();
+    paint();
+  };
+  header.appendChild(pivotReset);
+
+  const hasKfHere = obj.keyframes.some(k=>k.frame===S.frame);
+  const canDeleteKf = hasKfHere && obj.keyframes.length > 1;
+
+  const delKfBtn = el("button", "chip chip-danger compact-btn", "Delete Keyframe");
+  delKfBtn.disabled = !canDeleteKf;
+  delKfBtn.style.opacity = canDeleteKf ? "1" : ".4";
+  delKfBtn.title = canDeleteKf
+    ? "এই ফ্রেমের keyframe মুছে ফেলো"
+    : (hasKfHere ? "শেষ keyframe মুছা যাবে না" : "এই ফ্রেমে কোনো keyframe নেই");
+  delKfBtn.onclick = () => {
+    if(!canDeleteKf) return;
+    commit((ls,objs) => ({ imageObjects: objs.map(o => {
+      if(o.id!==obj.id) return o;
+      return { ...o, keyframes: o.keyframes.filter(k=>k.frame!==S.frame) };
+    }) }));
+    renderAll();
+  };
+  header.appendChild(delKfBtn);
+
+  const delObjBtn = el("button", "chip chip-danger compact-btn", "Delete Object");
   delObjBtn.onclick = () => {
   if(obj.isVideo) deleteVideoFrames(obj.id);
     commit((ls,objs) => ({ imageObjects: clearDanglingParents(objs.filter(o=>o.id!==obj.id)) }));
@@ -5536,6 +5854,36 @@ function renderObjectPanel(){
     renderAll();
   };
   header.appendChild(delObjBtn);
+
+  const kfForEasing = obj.keyframes.find(k=>k.frame===S.frame);
+  if(kfForEasing){
+    const easingSel = document.createElement("select");
+    easingSel.className = "chip";
+    easingSel.style.cssText = "padding:.2rem .35rem;font-size:.6rem;appearance:none;-webkit-appearance:none;-moz-appearance:none;text-align:center;text-align-last:center;";
+    Object.keys(EASINGS).forEach(k=>{
+      const o = document.createElement("option");
+      o.value = k;
+      o.textContent = EASING_LABELS[k];
+      if(kfForEasing.easing===k) o.selected = true;
+      easingSel.appendChild(o);
+    });
+    easingSel.onchange = (e) => {
+      const val = e.target.value;
+      commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : {
+        ...o, keyframes: o.keyframes.map(k => k.frame===S.frame ? { ...k, easing: val } : k)
+      }) }));
+      renderAll();
+    };
+    header.appendChild(easingSel);
+  }
+
+  const labelLine = el("div", "label", "IMAGE OBJECT · " + (function(){
+    const lo = S.layers.find(l=>l.id===obj.layerId);
+    return lo ? lo.name : "";
+  })());
+  labelLine.style.cssText = "width:100%;order:99;margin-top:.3rem;";
+  header.appendChild(labelLine);
+
   panel.appendChild(header);
 
   const parentField = el("div", "field");
@@ -5602,19 +5950,7 @@ function renderObjectPanel(){
     groupField.appendChild(gRow);
   }
 
-  const pivotResetRow = el("div", "layer-item-row");
-  pivotResetRow.style.marginTop = ".35rem";
-  const pivotReset = el("button", "chip compact-btn flex-1", "🎯 PIVOT সেন্টারে রিসেট");
-  pivotReset.onclick = () => {
-    const startKfs = obj.keyframes.map(k=>({ ...k }));
-    applyPivotChange(obj, startKfs, pivotOf(obj), { px:0.5, py:0.5 });
-    autosave();
-    renderObjectPanel();
-    paint();
-  };
-  pivotResetRow.appendChild(pivotReset);
-  groupField.appendChild(pivotResetRow);
-  panel.appendChild(groupField);
+panel.appendChild(groupField);
 
   const shapeField = el("div", "field");
   shapeField.appendChild(el("div", "label", "শেপ লাইব্রেরি (একাধিক ঠোঁট/এক্সপ্রেশন)"));
@@ -5854,7 +6190,6 @@ function renderAll(){
   if(onionAfterNumInput) onionAfterNumInput.value = S.onionAfter;
 
   renderTopKeyframeButton(); 
-  renderTopEasingSelect();
   renderTimeline();
   renderObjectPanel();
   syncAudioToFrame();
@@ -5878,6 +6213,10 @@ document.getElementById("btnPlay").onclick = () => {
     stopAudioPlayback();
   }
   renderAll();
+};
+document.getElementById("btnFitZoom").onclick = () => {
+  S.view = { z: 1, x: 0, y: 0 };
+  applyViewTransform();
 };
 
 document.getElementById("btnFpsToggle").onclick = (e) => {
