@@ -127,7 +127,16 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 
 .layer-popup-menu{position:fixed;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;box-shadow:var(--shadow-panel);width:90%;max-width:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:1000;display:flex;flex-direction:column;gap:.5rem;}
 .layer-popup-menu.hidden{display:none;}
-.layer-item-box{background:var(--secondary);border:1px solid var(--border);border-radius:6px;padding:6px;display:flex;flex-direction:column;gap:4px;}
+.layer-item-box{background:var(--secondary);border:1px solid var(--border);border-radius:6px;padding:3px 5px;display:flex;flex-direction:column;gap:0;transition:transform .12s ease,border-color .12s ease,opacity .12s ease;}
+.layer-row-main{display:flex;align-items:center;gap:5px;height:30px;}
+.layer-vis-btn{flex:0 0 auto;width:22px;height:22px;border-radius:4px;border:1px solid var(--border);background:var(--card);color:var(--foreground);font-size:.62rem;display:flex;align-items:center;justify-content:center;padding:0;}
+.layer-name-input{flex:1;min-width:0;background:transparent;border:none;color:var(--foreground);font-size:.66rem;padding:2px 3px;}
+.layer-op-badge{flex:0 0 auto;font-size:.56rem;color:var(--muted-foreground);padding:2px 5px;border-radius:4px;background:var(--card);border:1px solid var(--border);white-space:nowrap;}
+.layer-expand-panel{display:flex;flex-direction:column;gap:5px;padding:5px 2px 3px;border-top:1px dashed var(--border);margin-top:2px;}
+.layer-expand-panel.hidden{display:none;}
+.layer-item-box.layer-dragging{opacity:.85;border-color:var(--accent);box-shadow:0 8px 20px rgba(0,0,0,.5);transform:scale(1.03);position:relative;z-index:10;transition:transform .1s ease, box-shadow .1s ease;}
+.layer-drag-handle{flex:0 0 36px;width:36px;height:36px;padding:0;font-size:1.05rem;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+.layer-drag-handle:active{cursor:grabbing;}
 .layer-item-row{display:flex;align-items:center;gap:4px;}
 
 .swatch-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;}
@@ -207,7 +216,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 
 </style>
 </head>
-<script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script> 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script> 
 <body>
     <div id="loadingOverlay" style="position:fixed;inset:0;z-index:9998;background:#2c2620;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;">
   <div style="color:#e6a559;font-family:'Arial Narrow',Arial,sans-serif;font-size:2rem;letter-spacing:.05em;">FRAMEO</div>
@@ -217,6 +226,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
   <div style="width:100%;max-width:340px;background:#3a3128;border:1px solid #55483a;border-radius:12px;padding:1.5rem;color:#f2ede0;font-family:Arial,sans-serif;">
     <h2 id="authTitle" style="margin:0 0 1rem;text-align:center;">লগইন করুন</h2>
 
+    <div id="authLoginPanel">
     <div id="authRegisterFields" style="display:none;">
       <input id="authName" type="text" placeholder="নাম" style="width:100%;padding:.6rem;margin-bottom:.6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
     </div>
@@ -234,9 +244,32 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
       <span id="authToggleText">অ্যাকাউন্ট নেই? </span>
       <a href="#" id="authToggleLink" style="color:#e6a559;">রেজিস্ট্রেশন করুন</a>
     </div>
-    
+
   <div style="text-align:center;font-size:.75rem;margin-top:.4rem;">
   <a href="#" id="forgotPasswordLink" style="color:#e6a559;">পাসওয়ার্ড ভুলে গেছেন?</a>
+</div>
+</div>
+
+<div id="authForgotPanel" style="display:none;">
+  <p style="font-size:.78rem;color:#b8ab97;margin:0 0 .7rem;text-align:center;">আপনার ইমেইল দিন — রিসেট লিংক পাঠানো হবে।</p>
+  <input id="forgotEmail" type="email" placeholder="ইমেইল" style="width:100%;padding:.6rem;margin-bottom:.6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
+  <div id="forgotMsg" style="font-size:.75rem;margin-bottom:.6rem;display:none;"></div>
+  <button id="forgotSendBtn" style="width:100%;padding:.7rem;border:none;border-radius:6px;background:#e6a559;color:#2b1c0d;font-weight:700;margin-bottom:.6rem;">লিংক পাঠান</button>
+  <div style="text-align:center;font-size:.8rem;"><a href="#" id="backToLoginLink" style="color:#e6a559;">লগইনে ফিরে যান</a></div>
+</div>
+
+<div id="authResetPanel" style="display:none;">
+  <p style="font-size:.78rem;color:#b8ab97;margin:0 0 .7rem;text-align:center;">নতুন পাসওয়ার্ড সেট করুন।</p>
+  <div style="position:relative;margin-bottom:.6rem;">
+  <input id="resetPassword1" type="password" placeholder="নতুন পাসওয়ার্ড" style="width:100%;padding:.6rem 2.4rem .6rem .6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
+  <button type="button" id="toggleReset1" style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#b8ab97;font-size:1.1rem;cursor:pointer;padding:.2rem;">👁</button>
+  </div>
+  <div style="position:relative;margin-bottom:.6rem;">
+  <input id="resetPassword2" type="password" placeholder="আবার লিখুন" style="width:100%;padding:.6rem 2.4rem .6rem .6rem;border-radius:6px;border:1px solid #55483a;background:#453a2f;color:#f2ede0;box-sizing:border-box;" />
+  <button type="button" id="toggleReset2" style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#b8ab97;font-size:1.1rem;cursor:pointer;padding:.2rem;">👁</button>
+  </div>
+  <div id="resetMsg" style="font-size:.75rem;margin-bottom:.6rem;display:none;"></div>
+  <button id="resetSaveBtn" style="width:100%;padding:.7rem;border:none;border-radius:6px;background:#e6a559;color:#2b1c0d;font-weight:700;">পাসওয়ার্ড সেভ করুন</button>
 </div>
 </div>
 </div>
@@ -397,15 +430,16 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 (function(){
 "use strict";
 
-/* ================= APPWRITE AUTH ================= */
-const APPWRITE_ENDPOINT = "https://fra.cloud.appwrite.io/v1";
-const APPWRITE_PROJECT_ID = "6a8a57160028eba38d7a";
+/* ================= CLOUD AUTH (Supabase) ================= */
+const SB_URL = "https://ncldqxdqiucthodmuoyc.supabase.co";
+const SB_KEY = "sb_publishable_F1meNCd1SxqSdQAKjlvEUw_jsD8ogCs";
+const SB_BUCKET = "projects";
+const WORKER_URL = "https://frameo-storage.animationbd101.workers.dev";
+const sb = window.supabase.createClient(SB_URL, SB_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
+/* ================= END CLOUD AUTH (setup) ================= */
 
-const awClient = new Appwrite.Client()
-  .setEndpoint(APPWRITE_ENDPOINT)
-  .setProject(APPWRITE_PROJECT_ID);
-const awAccount = new Appwrite.Account(awClient);
-/* ================= END APPWRITE AUTH (setup) ================= */
 
 let isRegisterMode = false;
 let currentUserId = null;
@@ -434,10 +468,49 @@ function showAuthScreen(){
   document.getElementById("app").classList.add("hidden");
 }
 
+/* recovery link lands here: #type=recovery, ?type=recovery, ?code=..., ?token_hash=..., or our own ?reset=1 */
+const _q = new URLSearchParams(window.location.search);
+const _h = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+const isRecoveryLink =
+  /type=recovery/.test(window.location.hash) ||
+  /type=recovery/.test(window.location.search) ||
+  _q.get("reset") === "1" ||
+  _h.get("type") === "recovery";
+
+function showAuthPanel(which){
+  document.getElementById("authLoginPanel").style.display  = which === "login"  ? "block" : "none";
+  document.getElementById("authForgotPanel").style.display = which === "forgot" ? "block" : "none";
+  document.getElementById("authResetPanel").style.display  = which === "reset"  ? "block" : "none";
+  document.getElementById("authTitle").textContent =
+    which === "forgot" ? "পাসওয়ার্ড রিসেট" :
+    which === "reset"  ? "নতুন পাসওয়ার্ড" :
+    (isRegisterMode ? "রেজিস্ট্রেশন করুন" : "লগইন করুন");
+}
+
 async function checkSession(){
+  if(isRecoveryLink){
+    showAuthScreen();
+    showAuthPanel("reset");
+    /* establish the recovery session so updateUser() works */
+    try{
+      const th = _q.get("token_hash") || _h.get("token_hash");
+      const code = _q.get("code");
+      if(th){
+        await sb.auth.verifyOtp({ type: "recovery", token_hash: th });
+      }else if(code){
+        if(sb.auth.exchangeCodeForSession) await sb.auth.exchangeCodeForSession(code);
+      }
+      const at = _h.get("access_token"), rt = _h.get("refresh_token");
+      if(at && rt) await sb.auth.setSession({ access_token: at, refresh_token: rt });
+    }catch(e){
+      showMsg("resetMsg", "লিংকটি মেয়াদোত্তীর্ণ বা ব্যবহৃত হয়ে গেছে। আবার রিসেট লিংক নিন।", false);
+    }
+    return;
+  }
   try{
-    const user = await awAccount.get();
-    currentUserId = user.$id;
+    const { data, error } = await sb.auth.getUser();
+    if(error || !data || !data.user) throw new Error("no session");
+    currentUserId = data.user.id;
     await onUserReady();
     showApp();
   }catch(e){
@@ -445,6 +518,7 @@ async function checkSession(){
     showAuthScreen();
   }
 }
+
 
 document.getElementById("authToggleLink").onclick = (e) => {
   e.preventDefault();
@@ -468,19 +542,38 @@ document.getElementById("authSubmitBtn").onclick = async () => {
   try{
     if(isRegisterMode){
       if(!name){ showAuthError("নাম দিন"); return; }
-      await awAccount.create(Appwrite.ID.unique(), email, password, name);
-      await awAccount.createEmailPasswordSession(email, password);
+      const { data, error } = await sb.auth.signUp({
+        email, password,
+        options: { data: { name }, emailRedirectTo: window.location.origin + window.location.pathname }
+      });
+      if(error) throw error;
+      if(!data.session){
+        showAuthError("ইমেইলে পাঠানো কনফার্মেশন লিংকে ক্লিক করে তারপর লগইন করুন।");
+        return;
+      }
     } else {
-      await awAccount.createEmailPasswordSession(email, password);
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if(error) throw error;
     }
-    const user = await awAccount.get();
-    currentUserId = user.$id;
+    const { data: u, error: uErr } = await sb.auth.getUser();
+    if(uErr || !u.user) throw (uErr || new Error("লগইন সম্পূর্ণ হয়নি"));
+    currentUserId = u.user.id;
     await onUserReady();
     showApp();
   }catch(e){
-    showAuthError(e.message || "একটা সমস্যা হয়েছে");
+    const m = (e && e.message) ? e.message : "";
+    let bn = m || "একটা সমস্যা হয়েছে";
+    if(/weak|easy to guess|pwned/i.test(m)) bn = "পাসওয়ার্ডটি সহজে অনুমানযোগ্য। আরও শক্তিশালী পাসওয়ার্ড দিন।";
+    else if(/at least 6|should be at least/i.test(m)) bn = "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।";
+    else if(/already registered|User already/i.test(m)) bn = "এই ইমেইলে আগেই অ্যাকাউন্ট আছে। লগইন করুন।";
+    else if(/Invalid login credentials/i.test(m)) bn = "ইমেইল বা পাসওয়ার্ড ভুল।";
+    else if(/invalid|unable to validate email/i.test(m)) bn = "ইমেইল ঠিকানাটি সঠিক নয়।";
+    else if(/rate limit|too many/i.test(m)) bn = "অনেকবার চেষ্টা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।";
+    showAuthError(bn);
   }
+
 };
+
 async function onUserReady(){
   // নতুন ইউজারের জন্য পুরনো ইউজারের in-memory state/cache সাফ করা,
   // নইলে একজনের ডেটা আরেকজনের সেশনে "টিকে" থাকতে পারে
@@ -515,48 +608,99 @@ async function onUserReady(){
   }
 checkSession(); 
 
-document.getElementById("togglePassword").onclick = () => {
-  const pwField = document.getElementById("authPassword");
-  const btn = document.getElementById("togglePassword");
-  if(pwField.type === "password"){
-    pwField.type = "text";
-    btn.textContent = "🙈";
-  } else {
-    pwField.type = "password";
-    btn.textContent = "👁";
-  }
-};
-
-document.getElementById("forgotPasswordLink").onclick = async (e) => {
-  e.preventDefault();
-  const email = prompt("আপনার ইমেইল দিন:");
-  if(!email) return;
-  try{
-    await awAccount.createRecovery(email, window.location.origin + window.location.pathname);
-    alert("রিকভারি লিংক পাঠানো হয়েছে, ইমেইল চেক করুন।");
-  }catch(err){
-    alert("সমস্যা হয়েছে: " + (err.message || "আবার চেষ্টা করুন"));
-  }
-};
-
-async function handlePasswordRecovery(){
-  const params = new URLSearchParams(window.location.search);
-  const userId = params.get("userId");
-  const secret = params.get("secret");
-  if(!userId || !secret) return false;
-
-  const newPassword = prompt("নতুন পাসওয়ার্ড দিন:");
-  if(!newPassword){ return true; }
-  try{
-    await awAccount.updateRecovery(userId, secret, newPassword);
-    alert("পাসওয়ার্ড বদলানো হয়েছে! এবার নতুন পাসওয়ার্ড দিয়ে লগইন করুন।");
-  }catch(err){
-    alert("সমস্যা হয়েছে: " + (err.message || "লিংকটি মেয়াদোত্তীর্ণ হয়ে থাকতে পারে"));
-  }
-  window.history.replaceState({}, document.title, window.location.pathname);
-  return true;
+function setupToggle(btnId, fieldId){
+  const btn = document.getElementById(btnId);
+  const field = document.getElementById(fieldId);
+  btn.onclick = () => {
+    if(field.type === "password"){
+      field.type = "text";
+      btn.textContent = "🙈";
+    } else {
+      field.type = "password";
+      btn.textContent = "👁";
+    }
+  };
 }
-handlePasswordRecovery();
+setupToggle("togglePassword", "authPassword");
+setupToggle("toggleReset1", "resetPassword1");
+setupToggle("toggleReset2", "resetPassword2");
+
+function showMsg(id, text, ok){
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.style.color = ok ? "#7fc48a" : "#d9694f";
+  el.style.display = "block";
+}
+
+document.getElementById("forgotPasswordLink").onclick = (e) => {
+  e.preventDefault();
+  document.getElementById("forgotEmail").value = document.getElementById("authEmail").value.trim();
+  document.getElementById("forgotMsg").style.display = "none";
+  showAuthPanel("forgot");
+};
+
+document.getElementById("backToLoginLink").onclick = (e) => {
+  e.preventDefault();
+  showAuthPanel("login");
+};
+
+document.getElementById("forgotSendBtn").onclick = async () => {
+  const btn = document.getElementById("forgotSendBtn");
+  const email = document.getElementById("forgotEmail").value.trim();
+  if(!email){ showMsg("forgotMsg", "ইমেইল দিন", false); return; }
+  btn.disabled = true; btn.textContent = "পাঠানো হচ্ছে…";
+  try{
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + (window.location.pathname || "/frameo.html") + "?reset=1"
+    });
+    if(error) throw error;
+    showMsg("forgotMsg", "রিসেট লিংক পাঠানো হয়েছে। ইমেইল (স্প্যাম ফোল্ডারও) দেখুন।", true);
+  }catch(err){
+    const m = (err && err.message) || "";
+    showMsg("forgotMsg", /rate limit|too many|over_email/i.test(m)
+      ? "অনেকবার চেষ্টা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।"
+      : (m || "সমস্যা হয়েছে, আবার চেষ্টা করুন"), false);
+  }
+  btn.disabled = false; btn.textContent = "লিংক পাঠান";
+};
+
+document.getElementById("resetSaveBtn").onclick = async () => {
+  const btn = document.getElementById("resetSaveBtn");
+  const p1 = document.getElementById("resetPassword1").value;
+  const p2 = document.getElementById("resetPassword2").value;
+  if(!p1 || p1.length < 6){ showMsg("resetMsg", "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।", false); return; }
+  if(p1 !== p2){ showMsg("resetMsg", "দুইটি পাসওয়ার্ড মিলছে না।", false); return; }
+  btn.disabled = true; btn.textContent = "সেভ হচ্ছে…";
+  try{
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if(error) throw error;
+    showMsg("resetMsg", "পাসওয়ার্ড বদলানো হয়েছে!", true);
+    window.history.replaceState({}, document.title, window.location.pathname);
+    const { data: u } = await sb.auth.getUser();
+    if(u && u.user){
+      currentUserId = u.user.id;
+      await onUserReady();
+      showApp();
+    } else {
+      showAuthPanel("login");
+    }
+  }catch(err){
+    const m = (err && err.message) || "";
+    showMsg("resetMsg", /weak|easy to guess|pwned/i.test(m)
+      ? "পাসওয়ার্ডটি সহজে অনুমানযোগ্য। আরও শক্তিশালী দিন।"
+      : (m || "লিংকটি মেয়াদোত্তীর্ণ হয়ে থাকতে পারে"), false);
+  }
+  btn.disabled = false; btn.textContent = "পাসওয়ার্ড সেভ করুন";
+};
+
+/* recovery session হাতে এলে reset প্যানেল দেখানো */
+sb.auth.onAuthStateChange((event) => {
+  if(event === "PASSWORD_RECOVERY"){
+    showAuthScreen();
+    showAuthPanel("reset");
+  }
+});
+
 
 function setAppHeight(){
   const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
@@ -579,7 +723,7 @@ const PALETTE = [
 const TOOLS = [
   { id:"select", icon:"⛶", label:"Select / Transform" },
   { id:"brush", icon:"🖌️", label:"Brush" },
-  { id:"curve", icon:"⤴️", label:"Curve (Bezier)" },
+  { id:"curve", icon:"⤴", label:"Curve (Bezier)" },
   { id:"settings", icon:"⚙️", label:"Tool Settings" },
   { id:"eraser", icon:"🧽", label:"Eraser" },
   { id:"bucket", icon:"🛢", label:"Bucket Fill" },
@@ -4225,6 +4369,265 @@ function moveLayer(i,dir){
   renderAll();
 }
 
+/* ---------- Fast layer reordering ----------
+   Reordering only permutes S.layers; imageObjects are untouched, so we skip the
+   expensive deep clone in commit() and skip the full renderAll()/renderTimeline()
+   rebuild. The canvas repaints immediately, the popup list is rebuilt on its own
+   (cheap), and the heavy x-sheet rebuild is deferred/coalesced. */
+let _tlRebuildTimer = null;
+function scheduleTimelineRender(){
+  clearTimeout(_tlRebuildTimer);
+  _tlRebuildTimer = setTimeout(() => { renderTimeline(); }, 180);
+}
+
+function pushLayerOrderUndo(){
+  past.push({ layers: S.layers, imageObjects: S.imageObjects });
+  if(past.length>40) past.shift();
+  future = [];
+  renderUndoRedo();
+}
+
+function applyLayerOrder(newLayers, activeId){
+  pushLayerOrderUndo();
+  S.layers = newLayers;
+  const ai = activeId ? newLayers.findIndex(l => l.id===activeId) : S.activeLayer;
+  setActiveLayer(Math.max(0, Math.min(newLayers.length-1, ai)));
+  autosave();
+  paint();
+  scheduleTimelineRender();
+}
+
+function moveLayerFast(i, dir){
+  const j = i + dir;
+  if(j<0 || j>=S.layers.length) return;
+  const copy = [...S.layers];
+  const a = copy[i]; copy[i] = copy[j]; copy[j] = a;
+  applyLayerOrder(copy, a.id);
+  const popup = document.querySelector('.layer-popup-menu');
+  if(popup) buildLayerPopupList(popup);
+}
+
+const expandedLayerIds = new Set();
+
+function buildLayerPopupList(popupMenu){
+  popupMenu.querySelectorAll('.layer-item-box').forEach(n => n.remove());
+
+  for(let li=S.layers.length-1; li>=0; li--){
+    const l = S.layers[li];
+    const itemBox = el("div", "layer-item-box");
+    itemBox.dataset.layerId = l.id;
+    if(li===S.activeLayer) itemBox.style.borderColor = "var(--primary, #4aa8ff)";
+
+    const isOpen = expandedLayerIds.has(l.id);
+
+    // ---- চিকন মেইন লাইন (Ibis Paint স্টাইল) ----
+    const mainRow = el("div", "layer-row-main");
+
+    const dragBtn = el("button", "chip compact-btn layer-drag-handle", "⠿");
+    dragBtn.title = "চেপে ধরে টেনে লেয়ার উপরে-নিচে সরান";
+    dragBtn.setAttribute("aria-label", `${l.name} লেয়ারটি ধরে সরান`);
+    dragBtn.style.width = "26px"; dragBtn.style.height = "26px"; dragBtn.style.fontSize = ".85rem";
+    attachLayerDrag(dragBtn, itemBox, popupMenu);
+    mainRow.appendChild(dragBtn);
+
+    const visBtn = el("button", "layer-vis-btn", l.visible ? "👁" : "🚫");
+    visBtn.onclick = (e) => { e.stopPropagation(); toggleLayer(S.layers.indexOf(l)); const p=document.querySelector('.layer-popup-menu'); if(p) buildLayerPopupList(p); };
+    mainRow.appendChild(visBtn);
+
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "layer-name-input";
+    nameInput.value = l.name;
+    nameInput.onclick = (e) => e.stopPropagation();
+    nameInput.onpointerdown = (e) => e.stopPropagation();
+    nameInput.oninput = (e) => { l.name = e.target.value; autosave(); };
+    mainRow.appendChild(nameInput);
+    const opBadge = el("button", "layer-op-badge", `${Math.round(l.opacity*100)}%`);
+    opBadge.onclick = (e) => {
+      e.stopPropagation();
+      if(expandedLayerIds.has(l.id)) expandedLayerIds.delete(l.id);
+      else expandedLayerIds.add(l.id);
+      const p=document.querySelector('.layer-popup-menu'); if(p) buildLayerPopupList(p);
+    };
+    mainRow.appendChild(opBadge);
+
+    const delBtn = el("button", "chip compact-btn chip-danger", "✕");
+delBtn.style.width = "24px"; delBtn.style.height = "24px"; delBtn.style.padding = "0"; delBtn.style.fontSize=".65rem";
+delBtn.title = "লেয়ার মুছতে দুইবার ট্যাপ করুন";
+delBtn.onclick = (e) => {
+  e.stopPropagation();
+  if(delBtn.dataset.confirm === "1"){
+    clearTimeout(delBtn._confirmTimer);
+    removeLayer(S.layers.indexOf(l));
+    renderTimeline();
+  } else {
+    delBtn.dataset.confirm = "1";
+    delBtn.textContent = "✓";
+    delBtn.style.background = "#d9694f";
+    delBtn.style.color = "#fff";
+    delBtn.style.transform = "scale(1.15)";
+    delBtn._confirmTimer = setTimeout(() => {
+      delBtn.dataset.confirm = "";
+      delBtn.textContent = "✕";
+      delBtn.style.background = "";
+      delBtn.style.color = "";
+      delBtn.style.transform = "";
+    }, 2500);
+  }
+};
+mainRow.appendChild(delBtn);
+    mainRow.onclick = () => { focusLayer(); setActiveLayer(li); renderAll(); };
+    itemBox.appendChild(mainRow);
+
+    // ---- এক্সপ্যান্ডেবল প্যানেল: Opacity + Flip ----
+    const panel = el("div", `layer-expand-panel${isOpen ? "" : " hidden"}`);
+    panel.onclick = (e) => e.stopPropagation();
+
+    const opRow = el("div", "layer-item-row");
+    const opRange = document.createElement("input");
+    opRange.type = "range"; opRange.min = 10; opRange.max = 100;
+    opRange.value = Math.round(l.opacity*100);
+    opRange.style.flex = "1";
+    opRange.oninput = (e) => {
+      setLayerOpacity(S.layers.indexOf(l), Number(e.target.value)/100);
+      opBadge.textContent = `${e.target.value}%`;
+    };
+    opRow.appendChild(opRange);
+    panel.appendChild(opRow);
+    panel.appendChild(attachStepper(opRange));
+
+    const flipRow = el("div", "layer-item-row");
+    const flipHBtn = el("button", "chip compact-btn flex-1", "↔ Flip H");
+    flipHBtn.onclick = () => flipLayerObjects(S.layers.indexOf(l), "x");
+    flipRow.appendChild(flipHBtn);
+    const flipVBtn = el("button", "chip compact-btn flex-1", "↕ Flip V");
+    flipVBtn.onclick = () => flipLayerObjects(S.layers.indexOf(l), "y");
+    flipRow.appendChild(flipVBtn);
+    panel.appendChild(flipRow);
+
+    itemBox.appendChild(panel);
+    popupMenu.appendChild(itemBox);
+  }
+}
+
+/* Drag-to-reorder: moves the DOM node live (no state churn), commits the new
+   order once on release. */
+   
+function attachLayerDrag(handle, itemBox, popupMenu){
+  let dragging = false;
+  let pointerId = null;
+  let startY = 0;
+  let currentTranslateY = 0;
+
+  const animateOthers = (movedBox) => {
+    const boxes = [...popupMenu.querySelectorAll('.layer-item-box')].filter(b => b !== movedBox);
+    boxes.forEach(b => {
+      const first = b.__flipRect || b.getBoundingClientRect();
+      requestAnimationFrame(() => {
+        const last = b.getBoundingClientRect();
+        const dy = first.top - last.top;
+        if(Math.abs(dy) > 0.5){
+          b.style.transition = "none";
+          b.style.transform = `translateY(${dy}px)`;
+          requestAnimationFrame(() => {
+            b.style.transition = "transform .15s ease";
+            b.style.transform = "";
+          });
+        }
+        b.__flipRect = last;
+      });
+    });
+  };
+
+  const captureRects = () => {
+    [...popupMenu.querySelectorAll('.layer-item-box')].forEach(b => {
+      b.__flipRect = b.getBoundingClientRect();
+    });
+  };
+
+  const reorderIfNeeded = (clientY) => {
+    const others = [...popupMenu.querySelectorAll('.layer-item-box')].filter(b => b !== itemBox);
+    const before = others.find(b => {
+      const r = b.getBoundingClientRect();
+      return clientY < r.top + r.height / 2;
+    });
+
+    const curIndex = [...popupMenu.children].indexOf(itemBox);
+    const wantIndex = before ? [...popupMenu.children].indexOf(before) : popupMenu.children.length;
+    if(before && curIndex === wantIndex) return;
+    if(!before && curIndex === popupMenu.children.length - 1) return;
+
+    captureRects();
+
+    // ফিক্স: beforeRect অবশ্যই transform ছাড়া (pure base position) মাপতে হবে,
+    // নইলে আগের ফ্রেমের drag-অফসেট মিশে গিয়ে ভুল shift হিসাব হয়
+    itemBox.style.transform = "";
+    const beforeRect = itemBox.getBoundingClientRect();
+
+    if(before) popupMenu.insertBefore(itemBox, before);
+    else popupMenu.appendChild(itemBox);
+    animateOthers(itemBox);
+
+    const bounds = popupMenu.getBoundingClientRect();
+    if(clientY < bounds.top + 48) popupMenu.scrollTop -= 18;
+    else if(clientY > bounds.bottom - 48) popupMenu.scrollTop += 18;
+
+    // afterRect-ও transform ছাড়াই মাপা হচ্ছে (transform এখনও "" আছে),
+    // তাই দুটো measurement একই ভিত্তিতে — শুধু reorder/স্ক্রলের প্রকৃত শিফটটাই ধরা পড়বে
+    const afterRect = itemBox.getBoundingClientRect();
+    const shift = afterRect.top - beforeRect.top;
+    if(shift){
+      startY += shift;
+      currentTranslateY -= shift;
+    }
+    itemBox.style.transform = `translateY(${currentTranslateY}px)`;
+  };
+  const onMove = (ev) => {
+    if(!dragging || ev.pointerId !== pointerId) return;
+    ev.preventDefault();
+    currentTranslateY = ev.clientY - startY;
+    reorderIfNeeded(ev.clientY);
+    itemBox.style.transform = `translateY(${currentTranslateY}px)`;
+  };
+
+  const finish = (ev) => {
+    if(!dragging) return;
+    if(ev && ev.pointerId !== undefined && ev.pointerId !== pointerId) return;
+    dragging = false;
+    window.removeEventListener("pointermove", onMove, true);
+    window.removeEventListener("pointerup", finish, true);
+    window.removeEventListener("pointercancel", finish, true);
+    itemBox.classList.remove("layer-dragging");
+    itemBox.style.transition = "transform .15s ease";
+    itemBox.style.transform = "";
+    setTimeout(() => { itemBox.style.transition = ""; }, 160);
+
+    const ids = [...popupMenu.querySelectorAll('.layer-item-box')].map(b => b.dataset.layerId).reverse();
+    const byId = new Map(S.layers.map(l => [l.id, l]));
+    const next = ids.map(id => byId.get(id)).filter(Boolean);
+    if(next.length !== S.layers.length){ buildLayerPopupList(popupMenu); return; }
+    const changed = next.some((l, i) => l !== S.layers[i]);
+    if(changed) applyLayerOrder(next, itemBox.dataset.layerId);
+    buildLayerPopupList(popupMenu);
+  };
+
+  handle.addEventListener("pointerdown", (e) => {
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragging = true;
+    pointerId = e.pointerId;
+    startY = e.clientY;
+    currentTranslateY = 0;
+    itemBox.classList.add("layer-dragging");
+    if(navigator.vibrate) navigator.vibrate(15);
+    window.addEventListener("pointermove", onMove, { passive:false, capture:true });
+    window.addEventListener("pointerup", finish, true);
+    window.addEventListener("pointercancel", finish, true);
+  }, { passive:false });
+}
+
+
 function removeLayer(i){
   if(S.layers.length===1) return;
   const removedId = S.layers[i] ? S.layers[i].id : null;
@@ -4656,10 +5059,10 @@ function makeRangeScrollSafe(rangeEl){
   document.addEventListener("touchcancel", () => { if(state !== "idle") reset(); }, { passive: true });
 }
 
-function attachStepper(rangeEl){
+function attachStepper(rangeEl, customStep){
   const min = rangeEl.min !== "" ? Number(rangeEl.min) : -Infinity;
   const max = rangeEl.max !== "" ? Number(rangeEl.max) : Infinity;
-  const step = 1;
+  const step = customStep != null ? customStep : 1;
 
   const row = el("div", "stepper-row");
 
@@ -4683,7 +5086,8 @@ function attachStepper(rangeEl){
   }
 
   function pushToRange(v){
-    rangeEl.value = String(clamp(v));
+    const rv = Math.round(clamp(v)*100)/100;
+    rangeEl.value = String(rv);
     numInput.value = rangeEl.value;
     rangeEl.dispatchEvent(new Event("input", { bubbles:true }));
   }
@@ -5066,69 +5470,7 @@ function renderTimeline(){
 
   popupMenu.appendChild(el("div", "label", "All Layers List"));
 
-  for(let li=S.layers.length-1; li>=0; li--){
-  const l = S.layers[li];
-  const itemBox = el("div", "layer-item-box");
-
-  const row1 = el("div", "layer-item-row");
-  const nameInput = el("input");
-  nameInput.type = "text";
-  nameInput.value = l.name;
-  nameInput.style.flex = "1";
-  nameInput.style.padding = "3px 5px";
-  nameInput.style.background = "var(--card)";
-  nameInput.style.color = "var(--foreground)";
-  nameInput.style.border = "1px solid var(--border)";
-  nameInput.style.borderRadius = "4px";
-  nameInput.style.fontSize = "0.7rem";
-  nameInput.oninput = (e) => { l.name = e.target.value; autosave(); };
-  row1.appendChild(nameInput);
-
-  const upBtn = el("button", "chip compact-btn", "↑");
-  upBtn.onclick = () => { moveLayer(li, 1); renderTimeline(); };
-  row1.appendChild(upBtn);
-
-  const downBtn = el("button", "chip compact-btn", "↓");
-  downBtn.onclick = () => { moveLayer(li, -1); renderTimeline(); };
-  row1.appendChild(downBtn);
-
-  const delBtn = el("button", "chip compact-btn chip-danger", "✕");
-  delBtn.onclick = () => { removeLayer(li); renderTimeline(); };
-  row1.appendChild(delBtn);
-
-  itemBox.appendChild(row1);
-
-  const row2 = el("div", "layer-item-row");
-  const opLabel = el("span", "label", `Op: ${Math.round(l.opacity * 100)}%`);
-  opLabel.style.fontSize = "0.55rem";
-  row2.appendChild(opLabel);
-
-  const opRange = el("input");
-  opRange.type = "range";
-  opRange.min = 10;
-  opRange.max = 100;
-  opRange.value = Math.round(l.opacity * 100);
-  opRange.style.flex = "1";
-  opRange.oninput = (e) => { setLayerOpacity(li, Number(e.target.value) / 100); opLabel.textContent = `Op: ${e.target.value}%`; };
-  row2.appendChild(opRange);
-
-  itemBox.appendChild(row2);
-  itemBox.appendChild(attachStepper(opRange));
-
-  const row3 = el("div", "layer-item-row");
-  const flipHBtn = el("button", "chip compact-btn flex-1", "↔ Flip H (Layer)");
-  flipHBtn.title = "এই লেয়ারের সব ফ্রেমের সব ছবি অনুভূমিকভাবে ফ্লিপ হবে";
-  flipHBtn.onclick = () => { flipLayerObjects(li, "x"); };
-  row3.appendChild(flipHBtn);
-
-  const flipVBtn = el("button", "chip compact-btn flex-1", "↕ Flip V (Layer)");
-  flipVBtn.title = "এই লেয়ারের সব ফ্রেমের সব ছবি উলম্বভাবে ফ্লিপ হবে";
-  flipVBtn.onclick = () => { flipLayerObjects(li, "y"); };
-  row3.appendChild(flipVBtn);
-
-  itemBox.appendChild(row3);
-  popupMenu.appendChild(itemBox);
-}
+  buildLayerPopupList(popupMenu);
   // Render the popup at the root level so it always sits above sticky timeline/audio UI.
   // Position it just below the top-fixed area (canvas/tool-rail/transport) so the stage stays visible.
   const existingPopup = document.querySelector('.layer-popup-menu');
@@ -5541,8 +5883,9 @@ function buildDrawPanelContents(){
     if(S.tool === "eraser") S.eraserSize = v;
     else S.brushSize = v;
   };
-  sizeField.appendChild(sizeRange);
-  sizeField.appendChild(attachStepper(sizeRange));
+  sizeRange.step = 0.5;
+sizeField.appendChild(sizeRange);
+sizeField.appendChild(attachStepper(sizeRange, 0.5));
   container.appendChild(sizeField);
 
   if(S.tool !== "eraser"){
@@ -6078,37 +6421,37 @@ panel.appendChild(groupField);
     autosave();
     paint();
   };
-  rotField.appendChild(rotRange);
-  rotField.appendChild(attachStepper(rotRange));
+  rotRange.step = 0.5;
+rotField.appendChild(rotRange);
+rotField.appendChild(attachStepper(rotRange, 0.5));
   panel.appendChild(rotField);
 
   const sizeField = el("div", "field");
-  const curSizePct = Math.round(curT.w*100);
-  const sizeLabel = el("div", "label", `SIZE (জুম) ${curSizePct}%`);
-  sizeField.appendChild(sizeLabel);
-  const sizeRange = document.createElement("input");
-  sizeRange.type = "range"; sizeRange.min = 2; sizeRange.max = 400;
-  sizeRange.value = curSizePct;
-  sizeRange.oninput = (e) => {
-    const kf = getOrCreateKeyframeAtCurrentFrame(obj);
-    const newW = Math.max(0.02, Number(e.target.value)/100);
-    const ratio = newW/kf.w;
-    const newH = Math.max(0.02, kf.h*ratio);
-    const pv = pivotOf(obj);
-    const anchorX = kf.x + pv.px*kf.w;
-    const anchorY = kf.y + pv.py*kf.h;
-    kf.w = newW;
-    kf.h = newH;
-    kf.x = anchorX - pv.px*newW;
-    kf.y = anchorY - pv.py*newH;
-    sizeLabel.textContent = `SIZE (জুম) ${e.target.value}%`;
-    autosave();
-    paint();
-  };
-  sizeField.appendChild(sizeRange);
-  sizeField.appendChild(attachStepper(sizeRange));
-  panel.appendChild(sizeField);
-
+const curSizePct = Number((curT.w*100).toFixed(1));
+const sizeLabel = el("div", "label", `SIZE (জুম) ${curSizePct}%`);
+sizeField.appendChild(sizeLabel);
+const sizeRange = document.createElement("input");
+sizeRange.type = "range"; sizeRange.min = 2; sizeRange.max = 400; sizeRange.step = 0.2;
+sizeRange.value = curSizePct;
+sizeRange.oninput = (e) => {
+  const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+  const newW = Math.max(0.02, Number(e.target.value)/100);
+  const ratio = newW/kf.w;
+  const newH = Math.max(0.02, kf.h*ratio);
+  const pv = pivotOf(obj);
+  const anchorX = kf.x + pv.px*kf.w;
+  const anchorY = kf.y + pv.py*kf.h;
+  kf.w = newW;
+  kf.h = newH;
+  kf.x = anchorX - pv.px*newW;
+  kf.y = anchorY - pv.py*newH;
+  sizeLabel.textContent = `SIZE (জুম) ${e.target.value}%`;
+  autosave();
+  paint();
+};
+sizeField.appendChild(sizeRange);
+sizeField.appendChild(attachStepper(sizeRange, 0.2));
+panel.appendChild(sizeField);
   const pivotField = el("div", "field");
   const curPv = pivotOf(obj);
   pivotField.appendChild(el("div", "label",
@@ -6117,41 +6460,42 @@ panel.appendChild(groupField);
 
 
   const posXField = el("div", "field");
-  const curPosXPct = Math.round((curT.x+curT.w/2)*100);
-  const posXLabel = el("div", "label", `POSITION X (বামে ↔ ডানে) ${curPosXPct}%`);
-  posXField.appendChild(posXLabel);
-  const posXRange = document.createElement("input");
-  posXRange.type = "range"; posXRange.min = 0; posXRange.max = 100;
-  posXRange.value = curPosXPct;
-  posXRange.oninput = (e) => {
-    const kf = getOrCreateKeyframeAtCurrentFrame(obj);
-    const newCx = Number(e.target.value)/100;
-    kf.x = newCx - kf.w/2;
-    posXLabel.textContent = `POSITION X (বামে ↔ ডানে) ${e.target.value}%`;
-    autosave();
-    paint();
-  };
-  posXField.appendChild(posXRange);
-  posXField.appendChild(attachStepper(posXRange));
-  panel.appendChild(posXField);
+const curPosXPct = Number(((curT.x+curT.w/2)*100).toFixed(1));
+const posXLabel = el("div", "label", `POSITION X (বামে ↔ ডানে) ${curPosXPct}%`);
+posXField.appendChild(posXLabel);
+const posXRange = document.createElement("input");
+posXRange.type = "range"; posXRange.min = 0; posXRange.max = 100; posXRange.step = 0.2;
+posXRange.value = curPosXPct;
+posXRange.oninput = (e) => {
+  const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+  const newCx = Number(e.target.value)/100;
+  kf.x = newCx - kf.w/2;
+  posXLabel.textContent = `POSITION X (বামে ↔ ডানে) ${e.target.value}%`;
+  autosave();
+  paint();
+};
+posXField.appendChild(posXRange);
+posXField.appendChild(attachStepper(posXRange, 0.2));
+panel.appendChild(posXField);
 
-  const posYField = el("div", "field");
-  const curPosYPct = Math.round((curT.y+curT.h/2)*100);
-  const posYLabel = el("div", "label", `POSITION Y (উপরে ↕ নিচে) ${curPosYPct}%`);
-  posYField.appendChild(posYLabel);
-  const posYRange = document.createElement("input");
-  posYRange.type = "range"; posYRange.min = 0; posYRange.max = 100;
-  posYRange.value = curPosYPct;
-  posYRange.oninput = (e) => {
-    const kf = getOrCreateKeyframeAtCurrentFrame(obj);
-    const newCy = Number(e.target.value)/100;
-    kf.y = newCy - kf.h/2;
-    posYLabel.textContent = `POSITION Y (উপরে ↕ নিচে) ${e.target.value}%`;
-    autosave();
-    paint();
-  };
-  posYField.appendChild(posYRange);
-  posYField.appendChild(attachStepper(posYRange));
+const posYField = el("div", "field");
+const curPosYPct = Number(((curT.y+curT.h/2)*100).toFixed(1));
+const posYLabel = el("div", "label", `POSITION Y (উপরে ↕ নিচে) ${curPosYPct}%`);
+posYField.appendChild(posYLabel);
+const posYRange = document.createElement("input");
+posYRange.type = "range"; posYRange.min = 0; posYRange.max = 100; posYRange.step = 0.2;
+posYRange.value = curPosYPct;
+posYRange.oninput = (e) => {
+  const kf = getOrCreateKeyframeAtCurrentFrame(obj);
+  const newCy = Number(e.target.value)/100;
+  kf.y = newCy - kf.h/2;
+  posYLabel.textContent = `POSITION Y (উপরে ↕ নিচে) ${e.target.value}%`;
+  autosave();
+  paint();
+};
+posYField.appendChild(posYRange);
+posYField.appendChild(attachStepper(posYRange, 0.2));
+panel.appendChild(posYField);
   panel.appendChild(posYField);
 
   root.appendChild(panel);
@@ -6413,22 +6757,164 @@ async function localDeleteProject(id){
   await idbReq(store.delete(id));
 }
 
+/* ---- Cloud (Lovable Cloud Storage) store ----
+   প্রতি প্রজেক্টে দুটি ফাইল: <id>_m (হালকা মেটা: নাম/থাম্বনেইল/তারিখ)
+   এবং <id>_d (পুরো প্রজেক্ট ডেটা, ছবি ও অডিওসহ)। */
+let cloudDisabled = false;
+
+function cloudReady(){ return !!currentUserId && !cloudDisabled; }
+function cloudPath(id, suffix){
+  const safe = String(id).replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 40) || "p";
+  return `${currentUserId}/${safe}_${suffix}.json`;
+}
+
+function f32ToB64(arr){
+  const bytes = new Uint8Array(new Float32Array(arr || []).buffer);
+  let s = "";
+  const CH = 0x8000;
+  for(let i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(s);
+}
+function b64ToF32(b64){
+  try{
+    const bin = atob(b64 || "");
+    const bytes = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Float32Array(bytes.buffer);
+  }catch(e){ return new Float32Array(0); }
+}
+function encodeProjectForCloud(rec){
+  return {
+    ...rec,
+    audioClips: (rec.audioClips || []).map(c => ({ ...c, samples: { __f32: f32ToB64(c.samples) } }))
+  };
+}
+function decodeProjectFromCloud(rec){
+  if(!rec) return null;
+  return {
+    ...rec,
+    audioClips: (rec.audioClips || []).map(c => ({
+      ...c,
+      samples: c.samples && c.samples.__f32 !== undefined ? b64ToF32(c.samples.__f32) : new Float32Array(c.samples || [])
+    }))
+  };
+}
+async function getAccessToken(){
+  const { data } = await sb.auth.getSession();
+  return data && data.session ? data.session.access_token : null;
+}
+
+async function cloudDownloadJSON(path){
+  const token = await getAccessToken();
+  const res = await fetch(`${WORKER_URL}/${path}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if(!res.ok) throw new Error("download failed");
+  return await res.json();
+}
+async function cloudUploadJSON(path, obj){
+  const token = await getAccessToken();
+  const res = await fetch(`${WORKER_URL}/${path}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(obj)
+  });
+  if(!res.ok) throw new Error("upload failed");
+}
+const cloudMetaCache = new Map();   // id -> updatedAt (fast staleness check)
+const cloudSaveQueue = new Map();   // id -> promise chain (background uploads)
+
+async function cloudListProjects(){
+  if(!cloudReady()) return null;
+  try{
+    const token = await getAccessToken();
+    const res = await fetch(`${WORKER_URL}/?list=1`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if(!res.ok) throw new Error("list failed");
+    const { files } = await res.json();
+    const metaFiles = files.filter(f => /_m\.json$/.test(f));
+    const metas = await Promise.all(metaFiles.map(f => cloudDownloadJSON(f).catch(()=>null)));
+    const list = metas.filter(Boolean).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    for(const m of list) cloudMetaCache.set(m.id, m.updatedAt || 0);
+    return list;
+  }catch(e){ return null; }
+}
+
+
 async function listProjects(){
+  const cloud = await cloudListProjects();
+  if(cloud){
+    // অফলাইনে দেখার জন্য মেটা লোকালেও রাখা হয় — UI ব্লক না করে ব্যাকগ্রাউন্ডে
+    (async () => {
+      await Promise.all(cloud.map(async m => {
+        try{
+          const existing = await localGetProject(m.id);
+          if(!existing) await localPutProject({ ...m, layers: [], imageObjects: [], audioClips: [], __metaOnly: true });
+          else if((existing.updatedAt || 0) !== (m.updatedAt || 0)) await localPutProject({ ...existing, name: m.name, thumbnail: m.thumbnail, updatedAt: m.updatedAt });
+        }catch(e){}
+      }));
+    })();
+    return cloud;
+  }
   return await localListProjects();
 }
 async function getProject(id){
-  return await localGetProject(id);
+  // ১) লোকাল কপি আপ-টু-ডেট হলে সাথে সাথেই ফেরত — ক্লাউড ডাউনলোড লাগে না
+  let local = null;
+  try{ local = await localGetProject(id); }catch(e){}
+  if(local && !local.__metaOnly){
+    const known = cloudMetaCache.get(id);
+    if(!cloudReady() || (known !== undefined && (local.updatedAt || 0) >= known)) return local;
+  }
+  if(cloudReady()){
+    try{
+      const rec = decodeProjectFromCloud(await cloudDownloadJSON(cloudPath(id, "d")));
+      if(rec){
+        cloudMetaCache.set(id, rec.updatedAt || 0);
+        localPutProject(rec).catch(() => {});
+        return rec;
+      }
+    }catch(e){}
+  }
+  return local && local.__metaOnly ? null : local;
 }
 async function putProject(rec){
-  return await localPutProject(rec);
+  await localPutProject(rec);
+  cloudMetaCache.set(rec.id, rec.updatedAt || 0);
+  if(cloudReady()){
+    // ক্লাউডে আপলোড ব্যাকগ্রাউন্ডে — সেভ বাটন সাথে সাথেই সাড়া দেয়
+    const prev = cloudSaveQueue.get(rec.id) || Promise.resolve();
+    const job = prev.then(async () => {
+      try{
+        const meta = { id: rec.id, name: rec.name, thumbnail: rec.thumbnail, createdAt: rec.createdAt, updatedAt: rec.updatedAt };
+        await Promise.all([
+          cloudUploadJSON(cloudPath(rec.id, "d"), encodeProjectForCloud(rec)),
+          cloudUploadJSON(cloudPath(rec.id, "m"), meta)
+        ]);
+      }catch(e){ console.warn("cloud save failed", e); }
+    });
+    cloudSaveQueue.set(rec.id, job);
+    job.finally(() => { if(cloudSaveQueue.get(rec.id) === job) cloudSaveQueue.delete(rec.id); });
+  }
+  return true;
 }
 async function deleteProject(id){
   await localDeleteProject(id);
+  cloudMetaCache.delete(id);
+  if(cloudReady()){
+    const token = await getAccessToken();
+    try{
+      await fetch(`${WORKER_URL}/${cloudPath(id,"d")}`, { method:"DELETE", headers:{ Authorization:`Bearer ${token}` } });
+      await fetch(`${WORKER_URL}/${cloudPath(id,"m")}`, { method:"DELETE", headers:{ Authorization:`Bearer ${token}` } });
+    }catch(e){}
+  }
 }
 async function renameProject(rec, name){
-  const full = await localGetProject(rec.id);
-  if(full) await localPutProject({ ...full, name, updatedAt: Date.now() });
+  const full = await getProject(rec.id);
+  if(full) await putProject({ ...full, name, updatedAt: Date.now() });
 }
+
 
 
 async function duplicateProject(id){
@@ -6631,9 +7117,11 @@ function fmtProjDate(ts){
 }
 
 let openMenuId = null;
+let galleryRows = [];
 
-async function renderGallery(){
-  const rows = await listProjects();
+// লিস্ট আবার ডাউনলোড না করে শুধু কার্ডগুলো আঁকে — মেনু খোলা/বন্ধ সাথে সাথেই হয়
+function paintGallery(){
+  const rows = galleryRows;
   galleryGrid.innerHTML = "";
   galleryEmpty.classList.toggle("hidden", rows.length > 0);
   rows.forEach(rec => {
@@ -6641,6 +7129,8 @@ async function renderGallery(){
     const img = document.createElement("img");
     img.className = "proj-thumb";
     img.alt = rec.name;
+    img.loading = "lazy";
+    img.decoding = "async";
     if(rec.thumbnail) img.src = rec.thumbnail;
     card.appendChild(img);
     const meta = el("div", "proj-meta");
@@ -6656,7 +7146,7 @@ async function renderGallery(){
     menuBtn.onclick = (e) => {
       e.stopPropagation();
       openMenuId = (openMenuId === rec.id ? null : rec.id);
-      renderGallery();
+      paintGallery();
     };
 
     if(openMenuId === rec.id){
@@ -6667,18 +7157,19 @@ async function renderGallery(){
       ren.onclick = async (ev) => {
         ev.stopPropagation();
         openMenuId = null;
-        renderGallery();
+        paintGallery();
         const nm = (prompt("নতুন নাম:", rec.name) || "").trim();
         if(!nm) return;
+        rec.name = nm; rec.updatedAt = Date.now();
+        paintGallery();
         await renameProject(rec, nm);
-        renderGallery();
       };
       const dup = document.createElement("button");
       dup.textContent = "📄 Duplicate";
       dup.onclick = async (ev) => {
         ev.stopPropagation();
         openMenuId = null;
-        renderGallery();
+        paintGallery();
         await duplicateProject(rec.id);
         renderGallery();
       };
@@ -6687,11 +7178,12 @@ async function renderGallery(){
       del.onclick = async (ev) => {
         ev.stopPropagation();
         openMenuId = null;
-        renderGallery();
+        paintGallery();
         if(!confirm(`"${rec.name}" মুছে ফেলবেন?`)) return;
+        galleryRows = galleryRows.filter(r => r.id !== rec.id);
+        paintGallery();
         await deleteProject(rec.id);
         if(S.currentProjectId === rec.id){ S.currentProjectId = null; autosaveNow(); }
-        renderGallery();
       };
       menu.appendChild(ren);
       menu.appendChild(dup);
@@ -6702,7 +7194,7 @@ async function renderGallery(){
     card.onclick = () => {
       if(openMenuId !== null){
         openMenuId = null;
-        renderGallery();
+        paintGallery();
         return;
       }
       loadProject(rec.id);
@@ -6711,11 +7203,19 @@ async function renderGallery(){
   });
 }
 
+async function renderGallery(){
+  // ক্যাশ থাকলে আগে সেটাই দেখাই, পরে নতুন লিস্ট এলে আপডেট
+  if(galleryRows.length) paintGallery();
+  const rows = await listProjects();
+  galleryRows = rows || [];
+  paintGallery();
+}
+
 galleryOverlay.addEventListener('click', (e) => {
   if(!openMenuId) return;
   if(e.target.closest('.proj-menu') || e.target.closest('.proj-menu-btn')) return;
   openMenuId = null;
-  renderGallery();
+  paintGallery();
 });
 
 function openGallery(){
@@ -6750,7 +7250,7 @@ document.getElementById("btnGalleryNew").onclick = startNewProject;
 document.getElementById("btnGallerySaveAs").onclick = saveAsNewProject;
 document.getElementById("btnLogout").onclick = async () => {
   if(!confirm("লগআউট করবেন?")) return;
-  try{ await awAccount.deleteSession("current"); }catch(e){}
+  try{ await sb.auth.signOut(); }catch(e){}
   currentUserId = null;
   stopPlayback();
   stopAudioPlayback();
