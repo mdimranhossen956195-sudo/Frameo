@@ -5266,9 +5266,14 @@ async function exportVideoRecorder(scale){
     "video/mp4;codecs=avc1.42E01E",
     "video/mp4"
   ];
-  const mime = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m));
+  const webmCandidates = hasAudioTrack
+    ? ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+    : ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  const mime = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m))
+            || webmCandidates.find(m => MediaRecorder.isTypeSupported(m));
 
-  if(!mime){ alert("এই ব্রাউজারে MP4 এক্সপোর্ট সাপোর্ট করে না। Chrome বা Edge ব্যবহার করুন।"); return; }
+  if(!mime){ alert("এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট করে না।"); return; }
+  const isWebm = mime.indexOf("webm") >= 0;
 
   const rec = new MediaRecorder(combinedStream, {
     mimeType: mime, videoBitsPerSecond: scale===1 ? 20000000 : 8000000
@@ -5310,7 +5315,7 @@ async function exportVideoRecorder(scale){
   }
 
   const blob = new Blob(chunks, { type: mime });
-  downloadBlob(blob, mp4FileName(scale));
+  downloadBlob(blob, isWebm ? mp4FileName(scale).replace(".mp4", ".webm") : mp4FileName(scale));
 
   exportState.active = false;
   hideExportOverlay();
