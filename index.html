@@ -306,6 +306,9 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
     <button id="btnImportGallery" class="more-menu-item">
       <span class="mmi-icon">🖼️</span><span class="mmi-label">photo</span><span class="mmi-chevron">›</span>
     </button>
+    <button id="btnBackgroundPanel" class="more-menu-item">
+  <span class="mmi-icon">🖼️</span><span class="mmi-label">Background</span><span class="mmi-chevron">›</span>
+</button>
 <button id="btnImportVideo" class="more-menu-item">
       <span class="mmi-icon">🎬</span><span class="mmi-label">Video</span><span class="mmi-chevron">›</span>
     </button>
@@ -428,10 +431,21 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
     <p class="export-hint">ট্যাব খোলা রাখুন — ফাইল নিজে থেকেই ডাউনলোড হবে</p>
   </div>
 </div>
+<div id="bgOverlay" class="export-overlay hidden">
+  <div class="panel" style="max-width:300px;width:90%;text-align:left;">
+    <div class="font-display" style="font-size:1.05rem;margin-bottom:.5rem;">Background</div>
+    <img id="bgPreviewImg" src="" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#000;display:none;margin-bottom:.6rem;" />
+    <div id="bgEmptyHint" style="font-size:.75rem;color:var(--muted-foreground);margin-bottom:.6rem;">এখনো কোনো ব্যাকগ্রাউন্ড যোগ করা হয়নি।</div>
+    <button id="btnBgReplace" class="chip chip-accent w-full" style="margin-bottom:.4rem;">ব্যাকগ্রাউন্ড আপলোড/বদলাও</button>
+    <button id="btnBgRemove" class="chip chip-danger w-full" style="margin-bottom:.4rem;">ব্যাকগ্রাউন্ড সরাও</button>
+    <button id="btnBgClose" class="chip w-full">Close</button>
+  </div>
+</div>
 
 </div>
 
 <input id="photoInput" type="file" accept="image/*" class="hidden" />
+<input id="bgPhotoInput" type="file" accept="image/*" class="hidden" />
 <input id="audioInput" type="file" accept="audio/*" class="hidden" />
 <input id="shapeInput" type="file" accept="image/*" class="hidden" />
 <input id="videoInput" type="file" accept="video/*" class="hidden" />
@@ -4187,6 +4201,60 @@ async function importPhoto(file){
   S.tool = "select";
   renderAll();
 }
+function ensureBackgroundLayer(){
+  let bl = S.layers.find(l => l.isBackground);
+  if(bl) return bl;
+  const prevActiveId = S.layers[S.activeLayer] ? S.layers[S.activeLayer].id : null;
+  bl = emptyLayer("Background", frameCount());
+  bl.isBackground = true;
+  commit(ls => [bl, ...ls]);
+  if(prevActiveId){
+    const idx = S.layers.findIndex(l=>l.id===prevActiveId);
+    if(idx>=0) S.activeLayer = idx;
+  }
+  return bl;
+}
+
+function getBackgroundObject(){
+  const bl = S.layers.find(l=>l.isBackground);
+  if(!bl) return null;
+  return S.imageObjects.find(o=>o.layerId===bl.id) || null;
+}
+
+async function setBackgroundImage(file){
+  if(!file) return;
+  const bl = ensureBackgroundLayer();
+  const { src, natW, natH } = await processImportedImage(file);
+  const existing = S.imageObjects.find(o => o.layerId === bl.id);
+
+  if(existing){
+    // পুরনো position/scale ধরে রেখে শুধু ছবি বদলানো
+    commit((ls, objs) => ({ imageObjects: objs.map(o => o.id===existing.id ? { ...o, src, natW, natH } : o) }));
+  } else {
+    const ar = natW/natH;
+    const stageAr = STAGE_W/STAGE_H;
+    let w, h;
+    if(ar > stageAr){ w = 1; h = w/ar; if(h<1){ h=1; w=h*ar; } }
+    else { h = 1; w = h*ar; if(w<1){ w=1; h=w/ar; } }
+    const x = (1-w)/2, y = (1-h)/2;
+    const objId = uid();
+    const newObj = {
+      id:objId, layerId:bl.id, src, natW, natH,
+      parentId:null, parentBindFrame:null, group:"", hidden:false,
+      pivotX:0.5, pivotY:0.5, shapes:[], shapeKeyframes:[],
+      keyframes:[{ frame:0, x, y, w, h, rotation:0, opacity:1, flipX:false, flipY:false, easing:"linear" }]
+    };
+    commit((ls, objs) => ({ imageObjects:[...objs, newObj] }));
+  }
+  renderAll();
+}
+
+function removeBackgroundImage(){
+  const bl = S.layers.find(l=>l.isBackground);
+  if(!bl) return;
+  commit((ls, objs) => ({ imageObjects: objs.filter(o=>o.layerId!==bl.id) }));
+  renderAll();
+}
 async function extractVideoFrames(file, onProgress){
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
@@ -4584,9 +4652,9 @@ function startAudioPlaybackFromFrame(frame){
 }
 
 /* ---- Export helper: সব ক্লিপ একটা mono buffer-এ মিক্স করা ---- */
-function mixdownAudio(totalFrames){
+function mixdownAudio(totalFrames, targetRate){
   if(!S.audioClips.length) return null;
-  const sampleRate = S.audioClips[0].sampleRate || 48000;
+  const sampleRate = targetRate || S.audioClips[0].sampleRate || 48000;
   const totalSec = totalFrames / S.fps;
   const outLen = Math.max(1, Math.ceil(totalSec*sampleRate));
   const out = new Float32Array(outLen);
@@ -4651,6 +4719,7 @@ function setLayerOpacity(i,v){
 function moveLayer(i,dir){
   const j = i+dir;
   if(j<0 || j>=S.layers.length) return;
+  if(S.layers[i].isBackground || S.layers[j].isBackground) return;
   commit(ls => {
     const copy = [...ls];
     const a = copy[i];
@@ -4693,6 +4762,7 @@ function applyLayerOrder(newLayers, activeId){
 function moveLayerFast(i, dir){
   const j = i + dir;
   if(j<0 || j>=S.layers.length) return;
+  if(S.layers[i].isBackground || S.layers[j].isBackground) return;
   const copy = [...S.layers];
   const a = copy[i]; copy[i] = copy[j]; copy[j] = a;
   applyLayerOrder(copy, a.id);
@@ -4707,6 +4777,7 @@ function buildLayerPopupList(popupMenu){
 
   for(let li=S.layers.length-1; li>=0; li--){
     const l = S.layers[li];
+    
     const itemBox = el("div", "layer-item-box");
     itemBox.dataset.layerId = l.id;
     if(li===S.activeLayer) itemBox.style.borderColor = "var(--primary, #4aa8ff)";
@@ -4716,12 +4787,18 @@ function buildLayerPopupList(popupMenu){
     // ---- চিকন মেইন লাইন (Ibis Paint স্টাইল) ----
     const mainRow = el("div", "layer-row-main");
 
-    const dragBtn = el("button", "chip compact-btn layer-drag-handle", "⠿");
-    dragBtn.title = "চেপে ধরে টেনে লেয়ার উপরে-নিচে সরান";
-    dragBtn.setAttribute("aria-label", `${l.name} লেয়ারটি ধরে সরান`);
-    dragBtn.style.width = "26px"; dragBtn.style.height = "26px"; dragBtn.style.fontSize = ".85rem";
-    attachLayerDrag(dragBtn, itemBox, popupMenu);
-    mainRow.appendChild(dragBtn);
+    if(l.isBackground){
+  const lockIcon = el("span", null, "🔒");
+  lockIcon.style.cssText = "width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:.75rem;flex:0 0 auto;";
+  mainRow.appendChild(lockIcon);
+} else {
+  const dragBtn = el("button", "chip compact-btn layer-drag-handle", "⠿");
+  dragBtn.title = "চেপে ধরে টেনে লেয়ার উপরে-নিচে সরান";
+  dragBtn.setAttribute("aria-label", `${l.name} লেয়ারটি ধরে সরান`);
+  dragBtn.style.width = "26px"; dragBtn.style.height = "26px"; dragBtn.style.fontSize = ".85rem";
+  attachLayerDrag(dragBtn, itemBox, popupMenu);
+  mainRow.appendChild(dragBtn);
+}
 
     const visBtn = el("button", "layer-vis-btn", l.visible ? "👁" : "🚫");
     visBtn.onclick = (e) => { e.stopPropagation(); toggleLayer(S.layers.indexOf(l)); const p=document.querySelector('.layer-popup-menu'); if(p) buildLayerPopupList(p); };
@@ -4744,31 +4821,33 @@ function buildLayerPopupList(popupMenu){
     };
     mainRow.appendChild(opBadge);
 
-    const delBtn = el("button", "chip compact-btn chip-danger", "✕");
-delBtn.style.width = "24px"; delBtn.style.height = "24px"; delBtn.style.padding = "0"; delBtn.style.fontSize=".65rem";
-delBtn.title = "লেয়ার মুছতে দুইবার ট্যাপ করুন";
-delBtn.onclick = (e) => {
-  e.stopPropagation();
-  if(delBtn.dataset.confirm === "1"){
-    clearTimeout(delBtn._confirmTimer);
-    removeLayer(S.layers.indexOf(l));
-    renderTimeline();
-  } else {
-    delBtn.dataset.confirm = "1";
-    delBtn.textContent = "✓";
-    delBtn.style.background = "#d9694f";
-    delBtn.style.color = "#fff";
-    delBtn.style.transform = "scale(1.15)";
-    delBtn._confirmTimer = setTimeout(() => {
-      delBtn.dataset.confirm = "";
-      delBtn.textContent = "✕";
-      delBtn.style.background = "";
-      delBtn.style.color = "";
-      delBtn.style.transform = "";
-    }, 2500);
-  }
-};
-mainRow.appendChild(delBtn);
+    if(!l.isBackground){
+  const delBtn = el("button", "chip compact-btn chip-danger", "✕");
+  delBtn.style.width = "24px"; delBtn.style.height = "24px"; delBtn.style.padding = "0"; delBtn.style.fontSize=".65rem";
+  delBtn.title = "লেয়ার মুছতে দুইবার ট্যাপ করুন";
+  delBtn.onclick = (e) => {
+    e.stopPropagation();
+    if(delBtn.dataset.confirm === "1"){
+      clearTimeout(delBtn._confirmTimer);
+      removeLayer(S.layers.indexOf(l));
+      renderTimeline();
+    } else {
+      delBtn.dataset.confirm = "1";
+      delBtn.textContent = "✓";
+      delBtn.style.background = "#d9694f";
+      delBtn.style.color = "#fff";
+      delBtn.style.transform = "scale(1.15)";
+      delBtn._confirmTimer = setTimeout(() => {
+        delBtn.dataset.confirm = "";
+        delBtn.textContent = "✕";
+        delBtn.style.background = "";
+        delBtn.style.color = "";
+        delBtn.style.transform = "";
+      }, 2500);
+    }
+  };
+  mainRow.appendChild(delBtn);
+}
     mainRow.onclick = () => { focusLayer(); setActiveLayer(li); renderAll(); };
     itemBox.appendChild(mainRow);
 
@@ -4923,6 +5002,7 @@ function attachLayerDrag(handle, itemBox, popupMenu){
 
 function removeLayer(i){
   if(S.layers.length===1) return;
+  if(S.layers[i] && S.layers[i].isBackground) return; // ব্যাকগ্রাউন্ড লেয়ার ডিলিট করা যাবে না
   const removedId = S.layers[i] ? S.layers[i].id : null;
   commit((ls, objs) => ({
     layers: ls.filter((_,li) => li!==i),
@@ -5024,27 +5104,36 @@ async function exportVideoMp4WebCodecs(scale){
   const ctx = off.getContext("2d");
   if(!ctx) return false;
 
-  const mixed = mixdownAudio(frameCount());
-  const samples = mixed ? mixed.samples : null;
-  const sampleRate = mixed ? mixed.sampleRate : 48000;
-
-  let audioOk = false;
-  if(samples && typeof AudioEncoder !== "undefined"){
-    try{
-      const support = await AudioEncoder.isConfigSupported({
-        codec:"mp4a.40.2", sampleRate, numberOfChannels:1, bitrate:128000
-      });
-      audioOk = !!(support && support.supported);
-    }catch(e){ audioOk = false; }
+  let mixed = mixdownAudio(frameCount());
+let audioCodec = null;
+const tryCfg = async (codec, rate) => {
+  try{
+    const s = await AudioEncoder.isConfigSupported({
+      codec, sampleRate: rate, numberOfChannels: 1, bitrate: 128000
+    });
+    return !!(s && s.supported);
+  }catch(e){ return false; }
+};
+if(mixed && typeof AudioEncoder !== "undefined"){
+  if(await tryCfg("mp4a.40.2", mixed.sampleRate)) audioCodec = "aac";
+  else if(await tryCfg("opus", 48000)){
+    mixed = mixdownAudio(frameCount(), 48000);
+    audioCodec = "opus";
   }
+}
+if(S.audioClips.length && !audioCodec) return false;
+
+const audioOk = !!audioCodec;
+const samples = mixed ? mixed.samples : null;
+const sampleRate = mixed ? mixed.sampleRate : 48000;
 
   const target = new ArrayBufferTarget();
   const muxer = new Muxer({
     target,
     fastStart: "in-memory",
     video: { codec:"avc", width:w, height:h, frameRate:fps },
-    ...(audioOk ? { audio:{ codec:"aac", numberOfChannels:1, sampleRate } } : {})
-  });
+   ...(audioOk ? { audio:{ codec: audioCodec, numberOfChannels:1, sampleRate } } : {})
+    });
 
   const videoEncoder = new VideoEncoder({
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
@@ -5058,7 +5147,10 @@ async function exportVideoMp4WebCodecs(scale){
       output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
       error: (e) => console.error(e)
     });
-    audioEncoder.configure({ codec:"mp4a.40.2", sampleRate, numberOfChannels:1, bitrate:128000 });
+    audioEncoder.configure({
+  codec: audioCodec === "aac" ? "mp4a.40.2" : "opus",
+  sampleRate, numberOfChannels:1, bitrate:128000
+});
   }
 
   exportState.active = true;
@@ -5287,7 +5379,7 @@ async function exportVideo(scale){
   if(exportState.active) return;
   if(await exportVideoMp4WebCodecs(scale)) return;
   if(exportState.active) exportState.active = false;
-  if(await exportVideoMp4Wasm(scale)) return;
+  if(!S.audioClips.length && await exportVideoMp4Wasm(scale)) return;
   if(exportState.active) exportState.active = false;
   await exportVideoRecorder(scale);
 }
@@ -5809,6 +5901,7 @@ function renderTimeline(){
 
   for(let li=S.layers.length-1; li>=0; li--){
     const l = S.layers[li];
+    
     const row = el("div", "xsheet-row");
 
     const rowhead = el("div", `xsheet-rowhead${li===S.activeLayer && S.focus !== 'audio' ? " active" : ""}`);
@@ -7017,7 +7110,51 @@ document.getElementById("shapeInput").addEventListener("change", e => {
   e.target.value = "";
 });
 
+function renderBgPanel(){
+  const bgObj = getBackgroundObject();
+  const img = document.getElementById("bgPreviewImg");
+  const hint = document.getElementById("bgEmptyHint");
+  const removeBtn = document.getElementById("btnBgRemove");
+  if(bgObj){
+    img.src = bgObj.src;
+    img.style.display = "block";
+    hint.style.display = "none";
+    removeBtn.style.opacity = "1";
+    removeBtn.disabled = false;
+  } else {
+    img.style.display = "none";
+    hint.style.display = "block";
+    removeBtn.style.opacity = ".4";
+    removeBtn.disabled = true;
+  }
+}
 
+document.getElementById("btnBackgroundPanel").onclick = () => {
+  moreDropdown.classList.add("hidden");
+  btnMoreMenu.classList.remove("menu-open");
+  renderBgPanel();
+  document.getElementById("bgOverlay").classList.remove("hidden");
+};
+document.getElementById("btnBgClose").onclick = () => {
+  document.getElementById("bgOverlay").classList.add("hidden");
+};
+document.getElementById("btnBgReplace").onclick = () => {
+  document.getElementById("bgPhotoInput").click();
+};
+document.getElementById("bgPhotoInput").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  if(file){
+    setBackgroundImage(file).then(renderBgPanel).catch(err => {
+      console.error("ব্যাকগ্রাউন্ড যোগ ব্যর্থ:", err);
+      alert("সমস্যা হয়েছে: " + (err && err.message ? err.message : String(err)));
+    });
+  }
+  e.target.value = "";
+});
+document.getElementById("btnBgRemove").onclick = () => {
+  removeBackgroundImage();
+  renderBgPanel();
+};
 /* ================= Project Gallery (IndexedDB) ================= */
 const PROJ_DB_BASE = "frameo-studio-projects";
 const PROJ_STORE = "projects";
