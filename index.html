@@ -91,6 +91,7 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .xsheet-colheads{display:flex;}
 .xsheet-colhead{width:36px;min-width:36px;border-right:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:.62rem;color:var(--muted-foreground);cursor:pointer;}
 .xsheet-colhead.current{color:var(--accent);font-weight:700;background:rgba(230,165,89,.1);}
+
 .xsheet-row{border-bottom:1px solid rgba(255,255,255,.05);}
 .xsheet-rowhead{position:sticky;left:0;z-index:5;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;gap:.2rem;padding:0 4px;}
 .xsheet-rowhead.active{background:#473a2f;}
@@ -105,7 +106,7 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .xsheet-kf-line{position:absolute;top:50%;height:2px;background:rgba(230,165,89,.55);transform:translateY(-50%);pointer-events:none;z-index:1;}
 .xsheet-kf-diamond{width:9px;height:9px;background:var(--accent);border:1px solid #2b1c0d;transform:rotate(45deg);position:relative;z-index:2;}
 .xsheet-kf-diamond.selected{background:#ffffff;}
-
+.xsheet-kf-diamond.vf{background:#c77dff;}
 .audio-track-row{display:flex;height:var(--audio-row-h);border-bottom:1px solid rgba(255,255,255,.05);background:rgba(0,0,0,.16);position:sticky;top:0;z-index:30;}
 .audio-track-rowhead{position:sticky;left:0;z-index:60;width:110px;min-width:110px;background:var(--card);border-right:1px solid var(--border);display:flex;align-items:center;gap:.2rem;padding:0 4px;font-size:.62rem;}
 .audio-track-rowhead .lname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -184,6 +185,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 .export-overlay .panel{text-align:center;}
 .export-hint{margin:.35rem 0 0;font-size:.72rem;color:var(--muted-foreground);}
 .compact-btn{padding:.2rem .35rem;font-size:.6rem;}
+#viewChips .chip{flex:0 1 auto;}
 
 /* ---------- Project Gallery ---------- */
 .gallery-overlay{position:fixed;inset:0;z-index:200;background:var(--background,#1c1917);overflow:auto;padding:.75rem;}
@@ -333,6 +335,13 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
     </div>
 
     <div class="tool-rail" id="toolRail"></div>
+    
+    <div class="panel" id="charViewPanel" style="padding:.5rem .6rem;display:flex;align-items:center;gap:.3rem;flex-wrap:nowrap;">
+  <div id="viewChips" style="display:flex;gap:.3rem;flex-wrap:nowrap;flex:0 1 auto;min-width:0;"></div>
+  <button id="btnAddCharView" class="chip compact-btn" style="flex:0 0 auto;">+View</button>
+  <button id="btnSetViewKeyframe" class="chip compact-btn chip-accent" style="flex:0 0 auto;">+VF KF</button>
+  <button id="btnSyncViewPosition" class="chip compact-btn" style="flex:0 0 auto;">⇄ Sync</button>
+</div>
 
     <div class="panel transport-panel" style="display:flex;flex-direction:column;gap:.25rem;">
       <div class="transport">
@@ -378,7 +387,9 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
       </div>
 
       <div class="timeline-controls" style="border-top:1px solid rgba(255,255,255,.08);padding-top:.3rem;">
-        <button id="btnAddKeyframeTop" class="chip chip-xs chip-accent hidden">+KF</button>
+        <button id="btnAddKeyframeTop" 
+        class="chip chip-xs chip-accent hidden">+KF</button>
+        
         <button id="btnAddFrame" class="chip chip-xs">+Frame</button>
         <button id="btnDupFrame" class="chip chip-xs">Dup</button>
         <button id="btnCopy" class="chip chip-xs">Copy</button>
@@ -597,7 +608,9 @@ async function onUserReady(){
   S.currentProjectId = null;
   S.focus = "layer";
   past = []; future = [];
-
+S.charView = "front";
+  S.charViewList = ["front", "side", "back"];
+  S.viewKeyframes = [];
   tryRestore();               // এই ইউজারের localStorage key থেকে রিস্টোর
   renderAll();
   const gotAudio = await restoreAudioClips();   // এই ইউজারের IndexedDB থেকে অডিও রিস্টোর
@@ -890,6 +903,260 @@ function pivotPointOf(obj, t){
   return { x: t.x + p.px*t.w, y: t.y + p.py*t.h };
 }
 
+/* ================= Character View (Turnaround) ================= */
+function resolveActiveCharView(frame){
+  const kfs = S.viewKeyframes || [];
+  if(!kfs.length) return S.charView || "front";
+  let active = null;
+  for(const k of kfs){
+    if(k.frame <= frame && (!active || k.frame > active.frame)) active = k;
+  }
+  return active ? active.view : (S.charView || "front");
+}
+
+function ensureCharView(name){
+  const v = (name||"").trim();
+  if(!v) return;
+  if(!S.charViewList.includes(v)) S.charViewList.push(v);
+}
+
+function setCharView(view){
+  if(view === S.charView) return;
+  S.prevCharView = S.charView;
+  S.charView = view;
+  autosave();
+  renderAll();
+}
+
+function addCharViewPrompt(){
+  const name = (prompt("নতুন View-এর নাম দিন (যেমন: side, back, 3quarter):") || "").trim();
+  if(!name) return;
+  ensureCharView(name);
+  S.charView = name;
+  autosave();
+  renderAll();
+}
+
+function setViewKeyframeAtCurrentFrame(){
+  past.push({ layers: S.layers, imageObjects: cloneImageObjects(S.imageObjects), viewKeyframes: JSON.parse(JSON.stringify(S.viewKeyframes||[])) });
+  if(past.length>40) past.shift();
+  future = [];
+
+  const list = S.viewKeyframes || (S.viewKeyframes = []);
+  const existing = list.find(k=>k.frame===S.frame);
+  if(existing) existing.view = S.charView;
+  else list.push({ frame: S.frame, view: S.charView });
+  list.sort((a,b)=>a.frame-b.frame);
+  renderUndoRedo();
+  autosave();
+  renderAll();
+}
+function localTransformForWorld(obj, worldT, frame){
+  if(!obj.parentId) return { x:worldT.x, y:worldT.y, w:worldT.w, h:worldT.h, rotation:worldT.rotation };
+  const parentObj = findObjectById(obj.parentId);
+  if(!parentObj) return { x:worldT.x, y:worldT.y, w:worldT.w, h:worldT.h, rotation:worldT.rotation };
+
+  const bindFrame = Number.isFinite(obj.parentBindFrame) ? obj.parentBindFrame : frame;
+  const parentNow = worldTransformAt(parentObj, frame);
+  const parentBind = worldTransformAt(parentObj, bindFrame);
+  if(!parentNow || !parentBind) return { x:worldT.x, y:worldT.y, w:worldT.w, h:worldT.h, rotation:worldT.rotation };
+
+  const pPar = pivotOf(parentObj);
+  const pSelf = pivotOf(obj);
+
+  const cxNow = (parentNow.x + pPar.px*parentNow.w)*STAGE_W;
+  const cyNow = (parentNow.y + pPar.py*parentNow.h)*STAGE_H;
+  const cxBind = (parentBind.x + pPar.px*parentBind.w)*STAGE_W;
+  const cyBind = (parentBind.y + pPar.py*parentBind.h)*STAGE_H;
+
+  const MIN_DIM = 0.02;
+  const scaleW = parentBind.w>MIN_DIM ? parentNow.w/parentBind.w : 1;
+  const scaleH = parentBind.h>MIN_DIM ? parentNow.h/parentBind.h : 1;
+  const deltaRot = parentNow.rotation - parentBind.rotation;
+
+  const worldCxPx = (worldT.x + pSelf.px*worldT.w)*STAGE_W;
+  const worldCyPx = (worldT.y + pSelf.py*worldT.h)*STAGE_H;
+
+  const rotOffX = worldCxPx - cxNow;
+  const rotOffY = worldCyPx - cyNow;
+  const cos = Math.cos(deltaRot), sin = Math.sin(deltaRot);
+  const offX = rotOffX*cos + rotOffY*sin;
+  const offY = -rotOffX*sin + rotOffY*cos;
+
+  const safeScaleW = Math.max(0.05, Math.min(20, scaleW));
+  const safeScaleH = Math.max(0.05, Math.min(20, scaleH));
+
+  const childCxPx = offX/safeScaleW + cxBind;
+  const childCyPx = offY/safeScaleH + cyBind;
+  const localW = worldT.w/safeScaleW;
+  const localH = worldT.h/safeScaleH;
+
+  const result = {
+    x: childCxPx/STAGE_W - pSelf.px*localW,
+    y: childCyPx/STAGE_H - pSelf.py*localH,
+    w: localW,
+    h: localH,
+    rotation: worldT.rotation - deltaRot
+  };
+
+  const invalid =
+    !Number.isFinite(result.x) || !Number.isFinite(result.y) ||
+    !Number.isFinite(result.w) || !Number.isFinite(result.h) ||
+    result.w <= 0 || result.h <= 0 ||
+    result.x < -2 || result.x > 3 || result.y < -2 || result.y > 3;
+
+  if(invalid){
+    return { x:worldT.x, y:worldT.y, w:worldT.w, h:worldT.h, rotation:worldT.rotation };
+  }
+
+  return result;
+}
+function syncViewPosition(){
+  const oldView = S.prevCharView;
+  if(!oldView || oldView === S.charView){
+    alert("Sync করার মতো আগের কোনো View পাওয়া যায়নি। আগে একটা View থেকে অন্য View-তে সুইচ করুন।");
+    return;
+  }
+  const oldObjs = S.imageObjects.filter(o => (o.view||"") === oldView);
+  const newObjs = S.imageObjects.filter(o => (o.view||"") === S.charView);
+  if(!oldObjs.length || !newObjs.length){
+    alert("দুই View-এই অন্তত একটা করে object ট্যাগ করা থাকতে হবে।");
+    return;
+  }
+
+  // View-এর "বডি" = parent-হীন object-দের মধ্যে সবচেয়ে বড়টা
+  const bodyOf = list => {
+    const ids = new Set(list.map(o => o.id));
+    const roots = list.filter(o => !o.parentId || !ids.has(o.parentId));
+    let best = null, bestArea = -1;
+    (roots.length ? roots : list).forEach(o => {
+      const t = worldTransformAt(o, S.frame);
+      if(!t) return;
+      const area = t.w * t.h;
+      if(area > bestArea){ bestArea = area; best = o; }
+    });
+    return best;
+  };
+
+  const oldBody = bodyOf(oldObjs), newBody = bodyOf(newObjs);
+  if(!oldBody || !newBody) return;
+  const oldW = worldTransformAt(oldBody, S.frame);
+  const newW = worldTransformAt(newBody, S.frame);
+  if(!oldW || !newW) return;
+
+  // দুই বডির pivot বিন্দু (ঘাড়ের জোড়া) মেলানো
+  const a = pivotPointOf(oldBody, oldW);
+  const b = pivotPointOf(newBody, newW);
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+
+  // বদলানোর আগে নতুন View-এর সবার world নাও
+  const worlds = new Map();
+  newObjs.forEach(o => {
+    const w = worldTransformAt(o, S.frame);
+    if(w) worlds.set(o.id, w);
+  });
+
+  const preState = {
+    layers: S.layers,
+    imageObjects: cloneImageObjects(S.imageObjects),
+    viewKeyframes: JSON.parse(JSON.stringify(S.viewKeyframes || []))
+  };
+  S.imageObjects = cloneImageObjects(S.imageObjects);
+
+  // parent আগে, child পরে
+  const depth = id => {
+    let d = 0, cur = findObjectById(id);
+    const guard = new Set();
+    while(cur && cur.parentId && !guard.has(cur.id)){
+      guard.add(cur.id); d++; cur = findObjectById(cur.parentId);
+    }
+    return d;
+  };
+  const order = [...worlds.keys()].sort((p,q) => depth(p) - depth(q));
+
+  order.forEach(id => {
+    const obj = findObjectById(id);
+    const w = worlds.get(id);
+    if(!obj || !w) return;
+    const target = { x: w.x + dx, y: w.y + dy, w: w.w, h: w.h, rotation: w.rotation };
+    const local = localTransformForWorld(obj, target, S.frame);
+    const vals = {
+      x: local.x, y: local.y, w: local.w, h: local.h, rotation: local.rotation,
+      opacity: w.opacity, flipX: !!w.flipX, flipY: !!w.flipY
+    };
+    const kf = obj.keyframes.find(k => k.frame === S.frame);
+    if(kf) Object.assign(kf, vals);
+    else obj.keyframes.push({ frame: S.frame, ...vals, easing: "linear" });
+  });
+
+  // এই ফ্রেম থেকে নতুন View দেখানোর keyframe
+  const vlist = S.viewKeyframes || (S.viewKeyframes = []);
+  const ex = vlist.find(k => k.frame === S.frame);
+  if(ex) ex.view = S.charView;
+  else vlist.push({ frame: S.frame, view: S.charView });
+  vlist.sort((p,q) => p.frame - q.frame);
+
+  past.push(preState);
+  if(past.length > 40) past.shift();
+  future = [];
+  autosave();
+  renderUndoRedo();
+  renderAll();
+}
+
+function removeCharView(name){
+  if((S.charViewList||[]).length <= 1){
+    alert("অন্তত একটা View রাখতে হবে।");
+    return;
+  }
+  if(!confirm(`"${name}" View মুছে ফেলবেন?\nএই View-এর ট্যাগ করা object গুলো "সব View-তে" চলে যাবে।`)) return;
+
+  past.push({ layers: S.layers, imageObjects: cloneImageObjects(S.imageObjects), viewKeyframes: JSON.parse(JSON.stringify(S.viewKeyframes||[])) });
+  if(past.length>40) past.shift();
+  future = [];
+
+  S.charViewList = S.charViewList.filter(v => v !== name);
+  S.imageObjects = S.imageObjects.map(o => o.view === name ? { ...o, view: "" } : o);
+  S.viewKeyframes = (S.viewKeyframes||[]).filter(k => k.view !== name);
+  if(S.charView === name) S.charView = S.charViewList[0];
+  if(S.prevCharView === name) S.prevCharView = null;
+
+  renderUndoRedo();
+  autosave();
+  renderAll();
+}
+
+function assignObjectToView(obj, view){
+  commit((ls,objs) => ({ imageObjects: objs.map(o => o.id!==obj.id ? o : { ...o, view: view||"" }) }));
+  renderAll();
+}
+
+function renderViewBar(){
+  const chipsWrap = document.getElementById("viewChips");
+  if(!chipsWrap) return;
+  chipsWrap.innerHTML = "";
+  (S.charViewList||["front"]).forEach(v=>{
+    const b = el("button", `chip chip-xs${S.charView===v ? " chip-accent" : ""}`, v);
+    let pressTimer = null, longPressed = false;
+    const startPress = () => {
+      longPressed = false;
+      pressTimer = setTimeout(() => {
+        longPressed = true;
+        if(navigator.vibrate) navigator.vibrate(20);
+        removeCharView(v);
+      }, 700);
+    };
+    const cancelPress = () => { clearTimeout(pressTimer); };
+    b.addEventListener("pointerdown", startPress);
+    b.addEventListener("pointerup", cancelPress);
+    b.addEventListener("pointerleave", cancelPress);
+    b.addEventListener("pointercancel", cancelPress);
+    b.addEventListener("contextmenu", e => e.preventDefault());
+    b.onclick = () => { if(longPressed){ longPressed = false; return; } setCharView(v); };
+    chipsWrap.appendChild(b);
+  });
+}
 
 function worldTransformAt(obj, frame, visited){
   const local = objectTransformAt(obj, frame);
@@ -1277,9 +1544,11 @@ function drawOnionLayer(ctx, layers, imageObjects, index, w, h, alpha, tint){
 }
 
 function drawImageObjectsForLayer(ctx, imageObjects, layerId, layerOpacity, frame, w, h){
+  const __activeView = resolveActiveCharView(frame);
   imageObjects.forEach(o=>{
     if(o.layerId!==layerId) return;
     if(o.hidden) return;
+    if(o.view && o.view !== __activeView) return;
     const t = worldTransformAt(o, frame);
     if(!t) return;
     const shape = resolveActiveShape(o, frame);
@@ -1420,7 +1689,12 @@ const S = {
   audioSplitFrame: null,
   currentProjectId: null,
   // কোন ভিউ খোলা আছে: 'canvas' বা 'files'
-  currentView: "canvas"
+  currentView: "canvas",
+  // ক্যারেক্টার ভিউ (Turnaround) — front/side/back ইত্যাদি
+  charView: "front",
+  charViewList: ["front", "side", "back"],
+  viewKeyframes: [],
+  prevCharView: null
 };
 
 let past = [];
@@ -1473,10 +1747,15 @@ function commit(mutator){
 
 function undo(){
   if(!past.length) return;
-  future.push({ layers: S.layers, imageObjects: S.imageObjects });
+  future.push({
+    layers: S.layers,
+    imageObjects: S.imageObjects,
+    viewKeyframes: S.viewKeyframes
+  });
   const prev = past.pop();
   S.layers = prev.layers;
   S.imageObjects = prev.imageObjects;
+  if(prev.viewKeyframes !== undefined) S.viewKeyframes = prev.viewKeyframes;
   S.selectedObjectId = null;
   autosave();
   renderAll();
@@ -1484,15 +1763,19 @@ function undo(){
 
 function redo(){
   if(!future.length) return;
-  past.push({ layers: S.layers, imageObjects: S.imageObjects });
+  past.push({
+    layers: S.layers,
+    imageObjects: S.imageObjects,
+    viewKeyframes: S.viewKeyframes
+  });
   const next = future.pop();
   S.layers = next.layers;
   S.imageObjects = next.imageObjects;
+  if(next.viewKeyframes !== undefined) S.viewKeyframes = next.viewKeyframes;
   S.selectedObjectId = null;
   autosave();
   renderAll();
 }
-
 /* ---------- IndexedDB (অডিও ক্লিপ) ---------- */
 const AUDIO_DB_BASE = "frameo-studio-audio";
 const AUDIO_STORE = "clips";
@@ -1750,6 +2033,7 @@ function sanitizeImageObjects(rawObjects, layers, opts){
       parentId: null, parentBindFrame: null, group: "", hidden: false,
       pivotX: 0.5, pivotY: 0.5,
       shapes: [], shapeKeyframes: [],
+      view: "",
       ...o,
       layerId,
       hidden: !!o.hidden
@@ -1776,6 +2060,9 @@ function autosaveSnapshot(){
     onionBefore: S.onionBefore,
     onionAfter: S.onionAfter,
     onion: S.onion,
+    charView: S.charView,
+    charViewList: S.charViewList,
+    viewKeyframes: S.viewKeyframes,
     // session / UI অবস্থা
     frame: S.frame,
     activeLayer: S.activeLayer,
@@ -1844,6 +2131,9 @@ function tryRestore(){
       if(Number.isFinite(data.onionBefore)) S.onionBefore = data.onionBefore;
       if(Number.isFinite(data.onionAfter)) S.onionAfter = data.onionAfter;
 
+if(typeof data.charView === "string") S.charView = data.charView;
+      if(Array.isArray(data.charViewList) && data.charViewList.length) S.charViewList = data.charViewList;
+      if(Array.isArray(data.viewKeyframes)) S.viewKeyframes = data.viewKeyframes;
       // session / UI অবস্থা
       if(TOOLS.some(t => t.id === data.tool) && data.tool !== "settings") S.tool = data.tool;
       if(typeof data.color === "string") S.color = data.color;
@@ -3053,9 +3343,11 @@ if(S.tool === "bucket"){
     }
 
     if(!hitObj){
+      const __activeView = resolveActiveCharView(S.frame);
       for(let i=S.imageObjects.length-1; i>=0; i--){
         const obj = S.imageObjects[i];
         if(obj.layerId !== activeLayerId) continue;
+        if(obj.view && obj.view !== __activeView) continue;
         const layerObj = S.layers[S.activeLayer];
         if(!layerObj || !layerObj.visible) continue;
         if(objectHitTest(obj, p)==="move"){ hitObj = obj; hitMode = "move"; break; }
@@ -3884,6 +4176,7 @@ async function importPhoto(file){
     parentId: null, parentBindFrame: null, group: "", hidden: false,
     pivotX: 0.5, pivotY: 0.5,
     shapes: [], shapeKeyframes: [],
+    view: S.charView || "front",
     keyframes: [ { frame: S.frame, x, y, w, h, rotation: 0, opacity: 1, flipX: false, flipY: false, easing: "linear" } ]
   };
 
@@ -5562,7 +5855,11 @@ function renderTimeline(){
       const kfObjsHere = kfFramesByCell.get(f);
       if(kfObjsHere && kfObjsHere.length){
         const isSelected = kfObjsHere.some(o => o.id===S.selectedObjectId);
-        cell.appendChild(el("span", `xsheet-kf-diamond${isSelected ? " selected" : ""}`));
+        const hasVfHere = (S.viewKeyframes||[]).some(k=>k.frame===f);
+        let dcls = "xsheet-kf-diamond";
+        if(isSelected) dcls += " selected";
+        if(hasVfHere) dcls += " vf";
+        cell.appendChild(el("span", dcls));
       } else {
         const hasContent = (l.frames[f]||[]).length>0;
         if(hasContent){ cell.appendChild(el("span", "xsheet-dot")); }
@@ -6295,6 +6592,21 @@ function renderObjectPanel(){
 
 panel.appendChild(groupField);
 
+  const viewField = el("div", "field");
+  viewField.appendChild(el("div", "label", "VIEW ট্যাগ (Turnaround)"));
+  const viewRow = document.createElement("div");
+  viewRow.style.cssText = "display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem;";
+  const noneBtn = el("button", `chip compact-btn${!obj.view ? " chip-accent" : ""}`, "সব View-তে");
+  noneBtn.onclick = () => assignObjectToView(obj, "");
+  viewRow.appendChild(noneBtn);
+  (S.charViewList||[]).forEach(v=>{
+    const vb = el("button", `chip compact-btn${obj.view===v ? " chip-accent" : ""}`, v);
+    vb.onclick = () => assignObjectToView(obj, v);
+    viewRow.appendChild(vb);
+  });
+  viewField.appendChild(viewRow);
+  panel.appendChild(viewField);
+
   const shapeField = el("div", "field");
   shapeField.appendChild(el("div", "label", "শেপ লাইব্রেরি (একাধিক ঠোঁট/এক্সপ্রেশন)"));
 
@@ -6505,6 +6817,7 @@ panel.appendChild(posYField);
 
 function renderAll(){
   renderToolRail();
+  renderViewBar();
   if(typeof renderLassoBar==="function") renderLassoBar();
   if(typeof renderCurveBar==="function") renderCurveBar();
   renderUndoRedo();
@@ -6626,6 +6939,9 @@ onionAfterRange.oninput = (e) => {
 document.getElementById("onionAfterStepperRow").appendChild(attachStepper(onionAfterRange));
 
 document.getElementById("btnLoop").onclick = () => { S.loop = !S.loop; renderAll(); };
+document.getElementById("btnAddCharView").onclick = addCharViewPrompt;
+document.getElementById("btnSetViewKeyframe").onclick = setViewKeyframeAtCurrentFrame;
+document.getElementById("btnSyncViewPosition").onclick = syncViewPosition;
 document.getElementById("btnAddKeyframeTop").onclick = addKeyframeToSelectedObject;
 document.getElementById("btnAddFrame").onclick = addFrame;
 document.getElementById("btnDupFrame").onclick = duplicateFrame;
@@ -6991,6 +7307,9 @@ function buildProjectRecord(id, name, createdAt){
     bg: S.bg,
     onion: S.onion, onionBefore: S.onionBefore, onionAfter: S.onionAfter,
     frame: S.frame, activeLayer: S.activeLayer,
+    charView: S.charView,
+    charViewList: JSON.parse(JSON.stringify(S.charViewList || ["front","side","back"])),
+    viewKeyframes: JSON.parse(JSON.stringify(S.viewKeyframes || [])),
     createdAt: createdAt || Date.now(),
     updatedAt: Date.now()
   };
@@ -7046,6 +7365,9 @@ async function startNewProject(){
   S.view = { z: 1, x: 0, y: 0 };
   S.currentProjectId = null;
   past = []; future = [];
+  S.charView = "front";
+  S.charViewList = ["front", "side", "back"];
+  S.viewKeyframes = [];
   lastAudioSignature = null;
   autosaveNow();
   closeGallery();
@@ -7083,6 +7405,9 @@ async function loadProject(id){
   if(typeof rec.onion === "boolean") S.onion = rec.onion;
   if(Number.isFinite(rec.onionBefore)) S.onionBefore = rec.onionBefore;
   if(Number.isFinite(rec.onionAfter)) S.onionAfter = rec.onionAfter;
+  S.charView = typeof rec.charView === "string" ? rec.charView : "front";
+  S.charViewList = Array.isArray(rec.charViewList) && rec.charViewList.length ? rec.charViewList : ["front","side","back"];
+  S.viewKeyframes = Array.isArray(rec.viewKeyframes) ? JSON.parse(JSON.stringify(rec.viewKeyframes)) : [];
   S.activeLayer = Math.max(0, Math.min(S.layers.length-1, rec.activeLayer || 0));
   S.frame = Math.max(0, Math.min(frameCount()-1, rec.frame || 0));
   S.selectedAudioClipId = null;
