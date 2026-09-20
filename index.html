@@ -102,6 +102,7 @@ main{flex:1;display:flex;flex-direction:column;gap:.5rem;padding:.5rem;min-heigh
 .xsheet-cell:active{background:rgba(230,165,89,.2);}
 .xsheet-cell.current-frame{background:rgba(230,165,89,.08);}
 .xsheet-cell.active-cell{outline:2px solid var(--accent);outline-offset:-2px;z-index:2;}
+.xsheet-colhead.in-range,.xsheet-cell.in-range{background:rgba(217,105,79,.35) !important;}
 .xsheet-dot{width:7px;height:7px;border-radius:999px;background:var(--accent);}
 .xsheet-kf-line{position:absolute;top:50%;height:2px;background:rgba(230,165,89,.55);transform:translateY(-50%);pointer-events:none;z-index:1;}
 .xsheet-kf-diamond{width:9px;height:9px;background:var(--accent);border:1px solid #2b1c0d;transform:rotate(45deg);position:relative;z-index:2;}
@@ -204,7 +205,10 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 .proj-menu button{display:block;width:100%;padding:.4rem .5rem;background:none;border:none;color:inherit;font-size:.7rem;text-align:left;cursor:pointer;}
 .proj-menu button:hover{background:rgba(255,255,255,.08);}
 .gallery-empty{color:var(--muted-foreground);font-size:.8rem;padding:2rem 0;text-align:center;}
-
+.gallery-sync{position:relative;height:3px;margin:0 0 .6rem;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden;}
+.gallery-sync.hidden{display:none;}
+.gallery-sync-fill{position:absolute;top:0;left:0;height:100%;width:35%;background:var(--accent);border-radius:2px;animation:gallerySyncMove 1.1s ease-in-out infinite;}
+@keyframes gallerySyncMove{0%{left:-35%;}100%{left:100%;}}
 @media(max-width:420px){
   .icon-btn{width:1.65rem;height:1.65rem;font-size:.64rem;}
 .transport{gap:.3rem;padding:.3rem .25rem;}
@@ -420,7 +424,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
     <button id="btnGalleryClose" class="chip compact-btn">✕ Close</button>
   </div>
   
- 
+ <div id="gallerySyncBar" class="gallery-sync hidden"><div class="gallery-sync-fill"></div></div>
   <div id="galleryGrid" class="gallery-grid"></div>
   <div id="galleryEmpty" class="gallery-empty hidden">এখনো কোনো প্রজেক্ট সেভ করা হয়নি।</div>
 </div>
@@ -605,6 +609,7 @@ async function onUserReady(){
   audioDbPromise = null;
   projDbPromise = null;
   imageDbPromise = null;
+  videoDbPromise = null;
   audioRestoreDone = false;
   lastAudioSignature = null;
   lastImageAssetSignature = null;
@@ -632,8 +637,13 @@ S.charView = "front";
   await restoreImageAssets(); // ছবির আসল ডেটা IndexedDB থেকে রিস্টোর
   await rehydrateVideoObjects(S.imageObjects);
   preloadImageObjectSources(S.imageObjects).then(()=>{ renderAll(); paint(); }).catch(()=>{});
+
+  galleryRows = [];
+  galleryLoadedOnce = false;
+  localListProjects().then(rows => { if(rows && rows.length && !galleryRows.length) galleryRows = rows; }).catch(()=>{});
+  cloudListProjects().then(rows => { if(rows){ galleryRows = rows; syncLocalMeta(rows); galleryLoadedOnce = true; } }).catch(()=>{});
   }
-checkSession(); 
+ 
 
 function setupToggle(btnId, fieldId){
   const btn = document.getElementById(btnId);
@@ -810,7 +820,10 @@ function dedupeIdenticalKeyframes(obj){
 
   const kept = [kfs[0]];
   for(let i=1; i<kfs.length; i++){
-    if(!same(kept[kept.length-1], kfs[i])) kept.push(kfs[i]);
+    const sameAsPrev = same(kfs[i-1], kfs[i]);
+    const next = kfs[i+1];
+    const sameAsNext = next ? same(kfs[i], next) : false;
+    if(!(sameAsPrev && sameAsNext)) kept.push(kfs[i]);
   }
   return { ...obj, keyframes: kept };
 }
@@ -1171,9 +1184,65 @@ function renderViewBar(){
     chipsWrap.appendChild(b);
   });
 }
+function applyIdle(obj, t, frame){
+  const id = obj.idle;
+  if(!t || !id || !id.on) return t;
+  const s = Math.sin(2*Math.PI*frame/(id.period||24) + (id.phase||0));
+  return { ...t,
+    rotation: t.rotation + s*(id.rotDeg||0)*Math.PI/180,
+    y: t.y + s*(id.moveY||0)
+  };
+}
+function setIdle(objId, patch){
+  const cur = findObjectById(objId);
+  if(!cur) return;
+  const next = Object.assign(
+    { on:false, rotDeg:1.5, moveY:0.004, period:24, phase:0 },
+    cur.idle || {}, patch
+  );
+  S.imageObjects = S.imageObjects.map(o => o.id===objId ? { ...o, idle: next } : o);
+  autosave();
+  paint();
+}
 
+function buildIdleField(obj){
+  const cur = () => Object.assign(
+    { on:false, rotDeg:1.5, moveY:0.004, period:24, phase:0 },
+    (findObjectById(obj.id) || {}).idle || {}
+  );
+  const field = el("div", "field");
+  field.appendChild(el("div", "label", "IDLE মোশন (দোল)"));
+
+  const onBtn = el("button", `chip compact-btn w-full${cur().on ? " chip-accent" : ""}`, cur().on ? "Idle: ON" : "Idle: OFF");
+  onBtn.style.marginTop = ".35rem";
+  onBtn.onclick = () => { setIdle(obj.id, { on: !cur().on }); renderObjectPanel(); };
+  field.appendChild(onBtn);
+  if(!cur().on) return field;
+
+  const add = (text, key, min, max, step, show, store) => {
+    const lbl = el("div", "label", `${text} ${show(cur()[key])}`);
+    lbl.style.marginTop = ".5rem";
+    field.appendChild(lbl);
+    const r = document.createElement("input");
+    r.type = "range"; r.min = min; r.max = max; r.step = step;
+    r.value = show(cur()[key]);
+    r.oninput = (e) => {
+      const v = Number(e.target.value);
+      setIdle(obj.id, { [key]: store(v) });
+      lbl.textContent = `${text} ${v}`;
+    };
+    field.appendChild(r);
+    field.appendChild(attachStepper(r, step));
+  };
+
+  add("ROTATION (°)", "rotDeg", 0, 5, 0.1, v => v, v => v);
+  add("ওঠানামা (% উচ্চতা)", "moveY", 0, 2, 0.05, v => Number((v*100).toFixed(2)), v => v/100);
+  add("এক চক্র (ফ্রেম)", "period", 8, 96, 1, v => v, v => v);
+  add("PHASE (দেরি)", "phase", 0, 6.28, 0.1, v => v, v => v);
+  return field;
+}
 function worldTransformAt(obj, frame, visited){
-  const local = objectTransformAt(obj, frame);
+  const local = applyIdle(obj, objectTransformAt(obj, frame), frame);
   if(!local || !obj.parentId) return local;
 
   visited = visited ? new Set(visited) : new Set();
@@ -1961,9 +2030,10 @@ function openImageDb(){
 
 let lastImageAssetSignature = null;
 function imageAssetSignature(){
+  const sk = s => s ? (s.length + ":" + s.slice(s.length>>1, (s.length>>1)+32)) : "0";
   return S.imageObjects
     .filter(o=>!o.isVideo)
-    .map(o => o.id + ":" + (o.shapes||[]).map(s=>s.id).join(","))
+    .map(o => o.id + ":" + sk(o.src) + ":" + (o.shapes||[]).map(s=>s.id + sk(s.src)).join(","))
     .join("|");
 }
 
@@ -2132,7 +2202,7 @@ function tryRestore(){
     const data = JSON.parse(raw);
     if(data && Array.isArray(data.layers) && data.layers.length){
       S.layers = data.layers;
-      S.imageObjects = sanitizeImageObjects(data.imageObjects, S.layers, { mergeOverlapping: true });
+      S.imageObjects = sanitizeImageObjects(data.imageObjects, S.layers);
 
       S.layers = S.layers.map(l => ({
         ...l,
@@ -3622,6 +3692,8 @@ function pasteToCurrentFrame(){
 }
 
 function deleteFrame(){
+const rg = getFrameRange();
+  if(rg){ deleteFrameRange(rg); return; }
   if(frameCount()<=1){ mutateFrames(() => [[]]); renderAll(); return; }
   const f = S.frame;
   mutateFrames(frames => frames.filter((_,i) => i!==f));
@@ -3753,8 +3825,8 @@ function attachFrameSelection(node, f){
   node.addEventListener("click", e => {
     if(rangeAnchor !== null && rangeAnchor !== f && !_suppressRangeClick){
       e.stopPropagation();
-      setRange(rangeAnchor, f);
-      _suppressRangeClick = false;
+    e.stopImmediatePropagation();
+    setRange(rangeAnchor, f);
     }
   }, true);
 }
@@ -5060,8 +5132,12 @@ function downloadBlob(blob, name){
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
+const SCALE_1080 = 1.5; // 1280 × 1.5 = 1920×1080
+const SCALE_4K   = 3;   // 1280 × 3   = 3840×2160
+const isHD = scale => scale <= SCALE_1080;
+
 function mp4FileName(scale){
-  return scale===1 ? "youtube-animation-1080p.mp4" : "youtube-animation-4k.mp4";
+  return isHD(scale) ? "youtube-animation-1080p.mp4" : "youtube-animation-4k.mp4";
 }
 
 async function pickAvcCodec(w, h, fps, bitrate){
@@ -5085,8 +5161,7 @@ async function exportVideoMp4WebCodecs(scale){
   const w = STAGE_W*scale;
   const h = STAGE_H*scale;
   const fps = S.fps;
-  const bitrate = scale===1 ? 12000000 : 40000000;
-
+  const bitrate = isHD(scale) ? 12000000 : 40000000;
   const codec = await pickAvcCodec(w, h, fps, bitrate);
   if(!codec) return false;
 
@@ -5276,7 +5351,7 @@ async function exportVideoRecorder(scale){
   const isWebm = mime.indexOf("webm") >= 0;
 
   const rec = new MediaRecorder(combinedStream, {
-    mimeType: mime, videoBitsPerSecond: scale===1 ? 20000000 : 8000000
+    mimeType: mime, videoBitsPerSecond: isHD(scale) ? 12000000 : 40000000
   });
 
   const chunks = [];
@@ -5353,7 +5428,7 @@ async function exportVideoMp4Wasm(scale){
     enc.width = w - (w % 2);
     enc.height = h - (h % 2);
     enc.frameRate = S.fps;
-    enc.kbps = scale === 1 ? 12000 : 40000;
+    enc.kbps = isHD(scale) ? 12000 : 40000;
     enc.quantizationParameter = 20;
     enc.initialize();
 
@@ -5803,8 +5878,8 @@ function updateTimelineActive(){
   if(!table) return;
 
   // আগের ফ্রেমের হাইলাইট শুধু সরানো হচ্ছে (পুরো টেবিল স্ক্যান না করে)
-  if(_tlActiveEls.colhead) _tlActiveEls.colhead.classList.remove("current");
-  _tlActiveEls.cells.forEach(c => c.classList.remove("current-frame", "active-cell"));
+table.querySelectorAll(".xsheet-colhead.current").forEach(c => c.classList.remove("current"));
+  table.querySelectorAll(".xsheet-cell.current-frame, .xsheet-cell.active-cell").forEach(c => c.classList.remove("current-frame","active-cell"));
 
   const colhead = table.querySelector(`.xsheet-colhead[data-frame="${S.frame}"]`);
   if(colhead) colhead.classList.add("current");
@@ -5892,6 +5967,7 @@ function renderTimeline(){
     const _rh = getFrameRange();
     let hcls = `xsheet-colhead${f===S.frame ? " current" : ""}`;
     if(_rh && f>=_rh.s && f<=_rh.e) hcls += " in-range";
+    else if(rangeAnchor === f) hcls += " in-range";
     const h = el("div", hcls, String(f+1));
     h.dataset.frame = String(f);
     attachFrameSelection(h, f);
@@ -5945,7 +6021,7 @@ function renderTimeline(){
         if(f===_r.s) cls.push("range-start");
         if(f===_r.e) cls.push("range-end");
       }
-
+else if(rangeAnchor === f) cls.push("in-range");
       const cell = el("div", cls.join(" "));
       cell.dataset.frame = String(f);
       cell.dataset.layer = String(li);
@@ -6907,10 +6983,20 @@ posYField.appendChild(posYRange);
 posYField.appendChild(attachStepper(posYRange, 0.2));
 panel.appendChild(posYField);
   panel.appendChild(posYField);
-
+panel.appendChild(buildIdleField(obj));
   root.appendChild(panel);
   const allPanel = renderAllObjectsPanel();
   if(allPanel) root.appendChild(allPanel);
+}
+function goToFrame(f){
+  S.frame = f;
+  updateFrameCounter();
+  updateTimelineActive();
+  renderObjectPanel();
+  renderTopKeyframeButton();
+  
+  paint();
+  autosave();
 }
 
 function renderAll(){
@@ -6954,9 +7040,9 @@ function renderAll(){
 
 document.getElementById("btnUndo").onclick = undo;
 document.getElementById("btnRedo").onclick = redo;
-document.getElementById("btnFirst").onclick = () => { S.frame = 0; renderAll(); };
-document.getElementById("btnPrev").onclick = () => { S.frame = Math.max(0, S.frame-1); renderAll(); };
-document.getElementById("btnNext").onclick = () => { S.frame = Math.min(frameCount()-1, S.frame+1); renderAll(); };
+document.getElementById("btnFirst").onclick = () => goToFrame(0);
+document.getElementById("btnPrev").onclick = () => goToFrame(Math.max(0, S.frame-1));
+document.getElementById("btnNext").onclick = () => goToFrame(Math.min(frameCount()-1, S.frame+1));
 
 document.getElementById("btnPlay").onclick = () => {
   S.playing = !S.playing;
@@ -7067,8 +7153,8 @@ document.addEventListener("click", () => {
   moreDropdown.classList.add("hidden");
   btnMoreMenu.classList.remove("menu-open");
 });
-document.getElementById("b4k").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(2); };
-document.getElementById("b1080").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(1); };
+document.getElementById("b4k").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(SCALE_4K); };
+document.getElementById("b1080").onclick = () => { exportDropdown.classList.add("hidden"); exportVideo(SCALE_1080); };
 document.getElementById("bpng").onclick = () => { exportDropdown.classList.add("hidden"); exportPng(); };
 document.getElementById("bpngTransparent").onclick = () => { exportDropdown.classList.add("hidden"); exportPng(true); };
 document.getElementById("btnImportGallery").onclick = () => { document.getElementById("photoInput").click(); };
@@ -7282,7 +7368,7 @@ async function cloudUploadJSON(path, obj){
 const cloudMetaCache = new Map();   // id -> updatedAt (fast staleness check)
 const cloudSaveQueue = new Map();   // id -> promise chain (background uploads)
 
-async function cloudListProjects(){
+async function cloudListProjectsLegacy(){
   if(!cloudReady()) return null;
   try{
     const token = await getAccessToken();
@@ -7299,7 +7385,60 @@ async function cloudListProjects(){
   }catch(e){ return null; }
 }
 
+/* ---------- index.json: সব প্রজেক্টের মেটা একটাই ফাইলে ---------- */
+function cloudIndexPath(){ return `${currentUserId}/index.json`; }
+let cloudIndexChain = Promise.resolve();   // index আপডেট একটার পর একটা চলবে
 
+// সফল হলে array, না থাকলে/ব্যর্থ হলে null
+async function cloudReadIndex(){
+  try{
+    const token = await getAccessToken();
+    const res = await fetch(`${WORKER_URL}/${cloudIndexPath()}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) ? data : null;
+  }catch(e){ return null; }
+}
+
+async function cloudWriteIndex(list){
+  await cloudUploadJSON(cloudIndexPath(), list);
+}
+
+// read → বদলাও → write, একটার পর একটা (একই ডিভাইসে রেস এড়াতে)
+function cloudIndexUpdate(mutator){
+  const job = cloudIndexChain.then(async () => {
+    try{
+      let list = await cloudReadIndex();
+      if(!list) list = (await cloudListProjectsLegacy()) || [];
+      const next = mutator(list.slice());
+      await cloudWriteIndex(next);
+      for(const m of next) cloudMetaCache.set(m.id, m.updatedAt || 0);
+    }catch(e){ console.warn("index update failed", e); }
+  });
+  cloudIndexChain = job;
+  return job;
+}
+
+async function cloudListProjects(){
+  if(!cloudReady()) return null;
+
+  // ১) দ্রুত পথ: একটাই রিকোয়েস্ট
+  const idx = await cloudReadIndex();
+  if(idx && idx.length){
+    const list = idx.filter(m => m && m.id).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    for(const m of list) cloudMetaCache.set(m.id, m.updatedAt || 0);
+    return list;
+  }
+
+  // ২) index নেই/খালি: পুরনো পদ্ধতিতে আনো, তারপর index বানিয়ে রাখো (একবারের মাইগ্রেশন)
+  const legacy = await cloudListProjectsLegacy();
+  if(legacy && legacy.length){
+    cloudIndexChain = cloudIndexChain.then(() => cloudWriteIndex(legacy)).catch(()=>{});
+  }
+  return legacy;
+}
 async function listProjects(){
   const cloud = await cloudListProjects();
   if(cloud){
@@ -7350,7 +7489,9 @@ async function putProject(rec){
           cloudUploadJSON(cloudPath(rec.id, "d"), encodeProjectForCloud(rec)),
           cloudUploadJSON(cloudPath(rec.id, "m"), meta)
         ]);
+        await cloudIndexUpdate(list => [...list.filter(m => m.id !== meta.id), meta]);
       }catch(e){ console.warn("cloud save failed", e); }
+       
     });
     cloudSaveQueue.set(rec.id, job);
     job.finally(() => { if(cloudSaveQueue.get(rec.id) === job) cloudSaveQueue.delete(rec.id); });
@@ -7365,6 +7506,7 @@ async function deleteProject(id){
     try{
       await fetch(`${WORKER_URL}/${cloudPath(id,"d")}`, { method:"DELETE", headers:{ Authorization:`Bearer ${token}` } });
       await fetch(`${WORKER_URL}/${cloudPath(id,"m")}`, { method:"DELETE", headers:{ Authorization:`Bearer ${token}` } });
+      await cloudIndexUpdate(list => list.filter(m => m.id !== id));
     }catch(e){}
   }
 }
@@ -7399,6 +7541,22 @@ async function duplicateProject(id){
       volume: c.volume
     }))
   };
+  // ভিডিও object-এর জন্য নতুন id বানিয়ে ফ্রেমগুলো নতুন id-তে কপি করা
+  const idMap = new Map();
+  copy.imageObjects.forEach(o => { if(o.isVideo) idMap.set(o.id, uid()); });
+
+  for(const [oldId, newId] of idMap){
+    const blobs = await loadVideoFrames(oldId);
+    if(blobs && blobs.length) await saveVideoFrames(newId, blobs);
+  }
+
+  if(idMap.size){
+    copy.imageObjects = copy.imageObjects.map(o => ({
+      ...o,
+      id: idMap.get(o.id) || o.id,
+      parentId: (o.parentId && idMap.get(o.parentId)) || o.parentId
+    }));
+  }
   await putProject(copy);
   return copy;
 }
@@ -7670,12 +7828,52 @@ function paintGallery(){
   });
 }
 
+function syncLocalMeta(cloud){
+  (async () => {
+    await Promise.all(cloud.map(async m => {
+      try{
+        const existing = await localGetProject(m.id);
+        if(!existing) await localPutProject({ ...m, layers: [], imageObjects: [], audioClips: [], __metaOnly: true });
+        else if((existing.updatedAt || 0) !== (m.updatedAt || 0))
+          await localPutProject({ ...existing, name: m.name, thumbnail: m.thumbnail, updatedAt: m.updatedAt });
+      }catch(e){}
+    }));
+  })();
+}
+
+let galleryLoadedOnce = false;
+let galleryRenderToken = 0;
+
 async function renderGallery(){
-  // ক্যাশ থাকলে আগে সেটাই দেখাই, পরে নতুন লিস্ট এলে আপডেট
-  if(galleryRows.length) paintGallery();
-  const rows = await listProjects();
-  galleryRows = rows || [];
+  const token = ++galleryRenderToken;
+  const bar = document.getElementById("gallerySyncBar");
+
+  // ধাপ ১: লোকাল থেকে সাথে সাথে দেখাও
+  if(!galleryRows.length){
+    const local = await localListProjects();
+    if(token !== galleryRenderToken) return;
+    galleryRows = local || [];
+  }
+  // ক্লাউড আসার আগে "কোনো প্রজেক্ট নেই" লেখা দেখাবে না
   paintGallery();
+  if(!galleryLoadedOnce && !galleryRows.length) galleryEmpty.classList.add("hidden");
+
+  // ধাপ ২: সিঙ্ক বার দেখিয়ে ক্লাউড লিস্ট আনো
+  if(cloudReady() && bar) bar.classList.remove("hidden");
+  try{
+    const cloud = await cloudListProjects();
+    if(token !== galleryRenderToken) return;
+    if(cloud){
+      galleryRows = cloud;
+      syncLocalMeta(cloud);
+    }
+  }finally{
+    if(token === galleryRenderToken){
+      galleryLoadedOnce = true;
+      if(bar) bar.classList.add("hidden");
+      paintGallery();
+    }
+  }
 }
 
 galleryOverlay.addEventListener('click', (e) => {
@@ -7788,7 +7986,7 @@ window.__frameoPerf = {
   get lassoSelection(){ return lassoSel ? { size: lassoSel.ids.size, ids: [...lassoSel.ids], layer: lassoSel.layer, frame: lassoSel.frame } : null; },
   lassoSelectedStrokes
 };
-
+checkSession();
 })();
 </script>
 
