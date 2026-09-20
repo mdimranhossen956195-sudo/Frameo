@@ -316,6 +316,9 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 <button id="btnImportVideo" class="more-menu-item">
       <span class="mmi-icon">🎬</span><span class="mmi-label">Video</span><span class="mmi-chevron">›</span>
     </button>
+    <button id="btnCameraMenu" class="more-menu-item">
+  <span class="mmi-icon">🎥</span><span class="mmi-label">Camera</span><span class="mmi-chevron">›</span>
+</button>
     <div class="more-menu-divider"></div>
 
     <button id="btnLogout" class="more-menu-item more-menu-danger">
@@ -458,7 +461,18 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
 <script>
 (function(){
 "use strict";
-
+function camApply(ctx, cam, index, w, h, depth){
+  const d = Number.isFinite(depth) ? depth : 1;
+  const sh = (cam.shake||0)/100;
+  const sx = camNoise(index,1)*sh*0.03;
+  const sy = camNoise(index,2)*sh*0.03;
+  const sr = camNoise(index,3)*sh*0.03;
+  const z = Math.max(0.05, 1 + (cam.zoom-1)*Math.abs(d));
+  ctx.translate(w/2, h/2);
+  ctx.scale(z, z);
+  ctx.rotate(-(cam.rot + sr));
+  ctx.translate(-(0.5 + (cam.x-0.5)*d + sx)*w, -(0.5 + (cam.y-0.5)*d + sy)*h);
+}
 /* ================= CLOUD AUTH (Supabase) ================= */
 const SB_URL = "https://ncldqxdqiucthodmuoyc.supabase.co";
 const SB_KEY = "sb_publishable_F1meNCd1SxqSdQAKjlvEUw_jsD8ogCs";
@@ -1654,8 +1668,136 @@ function drawImageObjectsForLayer(ctx, imageObjects, layerId, layerOpacity, fram
     ctx.restore();
   });
 }
+let camRender = false;
+function camNoise(frame, seed){
+  const v = Math.sin(frame*12.9898 + seed*78.233) * 43758.5453;
+  return (v - Math.floor(v))*2 - 1;
+}
+function camKfAt(f){ return (S.cameraKeyframes||[]).find(k=>k.frame===f); }
 
+function cameraAt(frame){
+  const k = [...(S.cameraKeyframes||[])].sort((a,b)=>a.frame-b.frame);
+  if(!k.length) return null;
+  if(frame <= k[0].frame) return k[0];
+  const last = k[k.length-1];
+  if(frame >= last.frame) return last;
+  for(let i=0;i<k.length-1;i++){
+    const a=k[i], b=k[i+1];
+    if(frame>=a.frame && frame<=b.frame){
+      const t = (EASINGS[a.easing]||EASINGS.linear)((frame-a.frame)/(b.frame-a.frame));
+      return {
+        x: a.x+(b.x-a.x)*t, y: a.y+(b.y-a.y)*t,
+        zoom: a.zoom+(b.zoom-a.zoom)*t, rot: a.rot+(b.rot-a.rot)*t,
+        shake: (a.shake||0)+((b.shake||0)-(a.shake||0))*t
+      };
+    }
+  }
+  return last;
+}
+
+function setCamKf(patch){
+  const list = S.cameraKeyframes || (S.cameraKeyframes = []);
+  let k = camKfAt(S.frame);
+  const isNew = !k;
+  if(!k){
+    const c = cameraAt(S.frame) || { x:.5, y:.5, zoom:1, rot:0 };
+    k = { frame:S.frame, x:c.x, y:c.y, zoom:c.zoom, rot:c.rot, shake:c.shake||0, easing:"linear" };
+    list.push(k);
+  }
+  Object.assign(k, patch);
+  autosave();
+  paint();
+  if(isNew) renderTimeline();
+}
+
+function buildCameraPanel(){
+  const panel = el("div", "panel");
+  panel.appendChild(el("div", "label", "🎥 CAMERA — Play করলে কাজ করে"));
+  const cur = cameraAt(S.frame) || { x:.5, y:.5, zoom:1, rot:0 };
+  const has = !!camKfAt(S.frame);
+
+  const add = (text, min, max, step, val, onSet) => {
+    const f = el("div", "field");
+    const lbl = el("div", "label", `${text} ${val}`);
+    f.appendChild(lbl);
+    const r = document.createElement("input");
+    r.type = "range"; r.min = min; r.max = max; r.step = step; r.value = val;
+    r.oninput = e => { const v = Number(e.target.value); lbl.textContent = `${text} ${v}`; onSet(v); };
+    f.appendChild(r);
+    f.appendChild(attachStepper(r, step));
+    panel.appendChild(f);
+  };
+  add("X %", 0, 100, 0.5, +(cur.x*100).toFixed(1), v => setCamKf({ x: v/100 }));
+  add("Y %", 0, 100, 0.5, +(cur.y*100).toFixed(1), v => setCamKf({ y: v/100 }));
+  add("ZOOM %", 25, 400, 1, Math.round(cur.zoom*100), v => setCamKf({ zoom: v/100 }));
+  add("ROTATE °", -180, 180, 0.5, Math.round(cur.rot*180/Math.PI), v => setCamKf({ rot: v*Math.PI/180 }));
+add("SHAKE", 0, 100, 1, Math.round(cur.shake||0), v => setCamKf({ shake: v }));
+  const k = camKfAt(S.frame);
+  if(k){
+    const sel = document.createElement("select");
+    sel.className = "chip";
+    sel.style.marginTop = ".5rem";
+    Object.keys(EASINGS).forEach(n => {
+      const o = document.createElement("option");
+      o.value = n; o.textContent = EASING_LABELS[n];
+      if(k.easing === n) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = e => { k.easing = e.target.value; autosave(); };
+    panel.appendChild(sel);
+  }
+
+  const row = el("div", "layer-item-row");
+  row.style.marginTop = ".5rem";
+  const del = el("button", "chip compact-btn chip-danger flex-1", "Delete KF");
+  del.disabled = !has;
+  del.style.opacity = has ? "1" : ".4";
+  del.onclick = () => {
+    S.cameraKeyframes = S.cameraKeyframes.filter(x => x.frame !== S.frame);
+    autosave(); renderAll();
+  };
+  const close = el("button", "chip compact-btn flex-1", "✕ Close");
+  close.onclick = () => { S.camPanel = false; renderAll(); };
+  row.appendChild(del); row.appendChild(close);
+  panel.appendChild(row);
+  return panel;
+}
 function renderFrame(ctx, layers, imageObjects, index, w, h, bg, live){
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+
+  const cam = (camRender || exportState.active) ? cameraAt(index) : null;
+  const objs = imageObjects || [];
+
+  layers.forEach((l,li)=>{
+    if(!l.visible) return;
+    const strokes = [...(l.frames[index] || [])];
+    if(live && live.layer===li){ strokes.push(live.stroke); }
+
+    if(cam){ ctx.save(); camApply(ctx, cam, index, w, h, l.depth); }
+
+    const octx = scratchCtx(w,h);
+    if(!octx){
+      drawStrokes(ctx, strokes, w, h, l.opacity);
+    } else {
+      drawStrokes(octx, strokes, w, h, 1);
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = l.opacity;
+      ctx.drawImage(octx.canvas, 0, 0);
+      ctx.restore();
+    }
+
+    drawImageObjectsForLayer(ctx, objs, l.id, l.opacity, index, w, h);
+
+    if(cam) ctx.restore();
+  });
+}
+ function renderFrameOld(ctx, layers, imageObjects, index, w, h, bg, live){
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
@@ -1685,7 +1827,51 @@ function renderFrame(ctx, layers, imageObjects, index, w, h, bg, live){
     drawImageObjectsForLayer(ctx, objs, l.id, l.opacity, index, w, h);
   });
 }
+function renderFrameOld2(ctx, layers, imageObjects, index, w, h, bg, live){
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
 
+  const cam = (camRender || exportState.active) ? cameraAt(index) : null;
+  if(cam){
+    const sh = (cam.shake||0)/100;
+    const sx = camNoise(index,1)*sh*0.03;
+    const sy = camNoise(index,2)*sh*0.03;
+    const sr = camNoise(index,3)*sh*0.03;
+    ctx.save();
+    ctx.translate(w/2, h/2);
+    ctx.scale(cam.zoom, cam.zoom);
+    ctx.rotate(-(cam.rot + sr));
+    ctx.translate(-(cam.x + sx)*w, -(cam.y + sy)*h);
+  }
+
+  const objs = imageObjects || [];
+
+  layers.forEach((l,li)=>{
+    if(!l.visible) return;
+    const strokes = [...(l.frames[index] || [])];
+    if(live && live.layer===li){ strokes.push(live.stroke); }
+
+    const octx = scratchCtx(w,h);
+    if(!octx){
+      drawStrokes(ctx, strokes, w, h, l.opacity);
+    } else {
+      drawStrokes(octx, strokes, w, h, 1);
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = l.opacity;
+      ctx.drawImage(octx.canvas, 0, 0);
+      ctx.restore();
+    }
+
+    drawImageObjectsForLayer(ctx, objs, l.id, l.opacity, index, w, h);
+  });
+
+  if(cam) ctx.restore();
+}
 function drawSelectionBox(ctx, obj, w, h){
   const t = worldTransformAt(obj, S.frame);
   if(!t) return;
@@ -1777,7 +1963,9 @@ const S = {
   charView: "front",
   charViewList: ["front", "side", "back"],
   viewKeyframes: [],
-  prevCharView: null
+  prevCharView: null,
+  cameraKeyframes: [],
+  camPanel: false
 };
 
 let past = [];
@@ -2265,10 +2453,11 @@ function paint(){
   const w = canvas.width;
   const h = canvas.height;
   if(!w || !h) return;
-
+const camMode = S.playing || S.camPanel;
   const live = drawing ? { layer: S.activeLayer, stroke: drawing } : null;
+  camRender = camMode;
   renderFrame(ctx2d, S.layers, S.imageObjects, S.frame, w, h, S.bg, live);
-
+  camRender = false;
   if(S.onion && !S.playing){
     for(let k=1; k<=S.onionBefore; k++){
       const i = S.frame-k;
@@ -3369,7 +3558,7 @@ canvas.addEventListener("pointerdown", e=>{
     return;
   }
 
-  if(S.playing) return;
+  if(S.playing || S.camPanel) return;
 if(S.tool === "eyedropper"){
     const p = posFromEvent(e);
     pickColorAt(p.x, p.y);
@@ -4939,7 +5128,21 @@ function buildLayerPopupList(popupMenu){
     opRow.appendChild(opRange);
     panel.appendChild(opRow);
     panel.appendChild(attachStepper(opRange));
-
+const dLbl = el("div", "label", `PARALLAX ${l.depth ?? 1}`);
+    dLbl.style.marginTop = ".3rem";
+    panel.appendChild(dLbl);
+    const dRange = document.createElement("input");
+    dRange.type = "range"; dRange.min = -2; dRange.max = 2; dRange.step = 0.05;
+    dRange.value = l.depth ?? 1;
+    dRange.oninput = (e) => {
+      const v = Number(e.target.value);
+      l.depth = v;
+      dLbl.textContent = `PARALLAX ${v}`;
+      autosave();
+      paint();
+    };
+    panel.appendChild(dRange);
+    panel.appendChild(attachStepper(dRange, 0.05));
     const flipRow = el("div", "layer-item-row");
     const flipHBtn = el("button", "chip compact-btn flex-1", "↔ Flip H");
     flipHBtn.onclick = () => flipLayerObjects(S.layers.indexOf(l), "x");
@@ -5163,14 +5366,14 @@ async function exportVideoMp4WebCodecs(scale){
   const fps = S.fps;
   const bitrate = isHD(scale) ? 12000000 : 40000000;
   const codec = await pickAvcCodec(w, h, fps, bitrate);
-  if(!codec) return false;
+if(!codec){ alert("কারণ: H.264 কোডেক সাপোর্ট নেই (" + w + "x" + h + ")"); return false; }
 
   let Muxer, ArrayBufferTarget;
   try{
     const mod = await import("https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/+esm");
     Muxer = mod.Muxer;
     ArrayBufferTarget = mod.ArrayBufferTarget;
-  }catch(e){ return false; }
+}catch(e){ alert("কারণ: mp4-muxer লোড হয়নি"); return false; }
   if(!Muxer) return false;
 
   const off = document.createElement("canvas");
@@ -5180,52 +5383,67 @@ async function exportVideoMp4WebCodecs(scale){
   if(!ctx) return false;
 
   let mixed = mixdownAudio(frameCount());
-let audioCodec = null;
-const tryCfg = async (codec, rate) => {
-  try{
-    const s = await AudioEncoder.isConfigSupported({
-      codec, sampleRate: rate, numberOfChannels: 1, bitrate: 128000
-    });
-    return !!(s && s.supported);
-  }catch(e){ return false; }
-};
-if(mixed && typeof AudioEncoder !== "undefined"){
-  if(await tryCfg("mp4a.40.2", mixed.sampleRate)) audioCodec = "aac";
-  else if(await tryCfg("opus", 48000)){
-    mixed = mixdownAudio(frameCount(), 48000);
-    audioCodec = "opus";
+  let audioCodec = null;
+  const tryCfg = async (codec, rate) => {
+    try{
+      const s = await AudioEncoder.isConfigSupported({
+        codec, sampleRate: rate, numberOfChannels: 1, bitrate: 128000
+      });
+      return !!(s && s.supported);
+    }catch(e){ return false; }
+  };
+  if(mixed && typeof AudioEncoder !== "undefined"){
+    if(await tryCfg("mp4a.40.2", mixed.sampleRate)) audioCodec = "aac";
+    else if(await tryCfg("opus", 48000)){
+      mixed = mixdownAudio(frameCount(), 48000);
+      audioCodec = "opus";
+    }
   }
-}
-if(S.audioClips.length && !audioCodec) return false;
+  if(S.audioClips.length && !audioCodec){ alert("কারণ: অডিও এনকোডার সাপোর্ট নেই"); return false; }
 
-const audioOk = !!audioCodec;
-const samples = mixed ? mixed.samples : null;
-const sampleRate = mixed ? mixed.sampleRate : 48000;
+  const audioOk = !!audioCodec;
+  const samples = mixed ? mixed.samples : null;
+  const sampleRate = mixed ? mixed.sampleRate : 48000;
 
   const target = new ArrayBufferTarget();
   const muxer = new Muxer({
     target,
     fastStart: "in-memory",
     video: { codec:"avc", width:w, height:h, frameRate:fps },
-   ...(audioOk ? { audio:{ codec: audioCodec, numberOfChannels:1, sampleRate } } : {})
-    });
+    ...(audioOk ? { audio:{ codec: audioCodec, numberOfChannels:1, sampleRate } } : {})
+  });
 
+  let videoError = null;
   const videoEncoder = new VideoEncoder({
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-    error: (e) => console.error(e)
+    error: (e) => { videoError = e; console.error("VideoEncoder error:", e); }
   });
   videoEncoder.configure({ codec, width:w, height:h, framerate:fps, bitrate, avc:{ format:"avc" } });
 
+  let audioError = null;
   let audioEncoder = null;
   if(audioOk){
     audioEncoder = new AudioEncoder({
       output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-      error: (e) => console.error(e)
+      error: (e) => { audioError = e; console.error("AudioEncoder error:", e); }
     });
     audioEncoder.configure({
-  codec: audioCodec === "aac" ? "mp4a.40.2" : "opus",
-  sampleRate, numberOfChannels:1, bitrate:128000
-});
+      codec: audioCodec === "aac" ? "mp4a.40.2" : "opus",
+      sampleRate, numberOfChannels:1, bitrate:128000
+    });
+  }
+
+  function waitForQueue(encoder, max){
+    return new Promise(resolve => {
+      if(encoder.encodeQueueSize <= max) return resolve();
+      const onDequeue = () => {
+        if(encoder.encodeQueueSize <= max){
+          encoder.removeEventListener('dequeue', onDequeue);
+          resolve();
+        }
+      };
+      encoder.addEventListener('dequeue', onDequeue);
+    });
   }
 
   exportState.active = true;
@@ -5239,7 +5457,9 @@ const sampleRate = mixed ? mixed.sampleRate : 48000;
   try{
     const total = frameCount();
     for(let i=0; i<total; i++){
+      if(videoError) throw videoError;
       await ensureFrameImagesDecoded(i);
+      await waitForQueue(videoEncoder, 2);
       renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
       const frame = new VideoFrame(off, {
         timestamp: Math.round(i*1e6/fps),
@@ -5248,15 +5468,18 @@ const sampleRate = mixed ? mixed.sampleRate : 48000;
       videoEncoder.encode(frame, { keyFrame: i % fps === 0 });
       frame.close();
       showExportOverlay(`MP4 রেন্ডার হচ্ছে ${i+1}/${total}`);
-      if(videoEncoder.encodeQueueSize > 8) await new Promise(r => setTimeout(r, 0));
-      else if(i % 3 === 0) await new Promise(r => setTimeout(r, 0));
     }
+
+    await videoEncoder.flush();
+    if(videoError) throw videoError;
 
     if(audioEncoder){
       const videoDurSec = total/fps;
       const maxSamples = Math.min(samples.length, Math.ceil(videoDurSec*sampleRate));
       const CHUNK = 1024;
       for(let off2=0; off2<maxSamples; off2+=CHUNK){
+        if(audioError) throw audioError;
+        await waitForQueue(audioEncoder, 8);
         const len = Math.min(CHUNK, maxSamples-off2);
         const data = new Float32Array(len);
         data.set(samples.subarray(off2, off2+len));
@@ -5270,21 +5493,22 @@ const sampleRate = mixed ? mixed.sampleRate : 48000;
         });
         audioEncoder.encode(audioData);
         audioData.close();
-        if(audioEncoder.encodeQueueSize > 16) await new Promise(r => setTimeout(r, 0));
       }
+      await audioEncoder.flush();
+      if(audioError) throw audioError;
     }
 
     showExportOverlay("MP4 ফাইল তৈরি হচ্ছে…");
-    await videoEncoder.flush();
-    if(audioEncoder) await audioEncoder.flush();
     muxer.finalize();
 
     downloadBlob(new Blob([target.buffer], { type:"video/mp4" }), mp4FileName(scale));
     return true;
   }catch(err){
-    console.error(err);
+  
+    console.error("Export failed:", err);
+    alert("Export error: " + (err && err.message ? err.message : String(err)));
     return false;
-  }finally{
+}finally{
     try{ videoEncoder.close(); }catch(e){}
     if(audioEncoder){ try{ audioEncoder.close(); }catch(e){} }
     exportState.active = false;
@@ -5304,7 +5528,8 @@ async function exportVideoRecorder(scale){
 
   if(!off.captureStream || !window.MediaRecorder){ alert("এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট করে না।"); return; }
 
-  const videoStream = off.captureStream(S.fps);
+  const videoStream = off.captureStream(0);
+const videoTrack = videoStream.getVideoTracks()[0];
 
   let exportAudioCtx = null;
   let exportAudioSource = null;
@@ -5374,6 +5599,7 @@ async function exportVideoRecorder(scale){
   for(let i=0; i<frameCount(); i++){
     await ensureFrameImagesDecoded(i);
     renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
+    videoTrack.requestFrame();
     showExportOverlay(`MP4 রেন্ডার হচ্ছে ${i+1}/${frameCount()}`);
     await new Promise(r => setTimeout(r, Math.max(1000/S.fps, 40)));
   }
@@ -5457,13 +5683,16 @@ async function exportVideoMp4Wasm(scale){
 
 async function exportVideo(scale){
   if(exportState.active) return;
-  if(await exportVideoMp4WebCodecs(scale)) return;
+  try{
+    if(await exportVideoMp4WebCodecs(scale)){ console.log("export: WebCodecs OK"); return; }
+  }catch(e){ console.error("WebCodecs:", e); }
+  alert("WebCodecs এক্সপোর্ট ব্যর্থ — ফলব্যাকে যাচ্ছে (ফাইল ছোট হতে পারে)");
   if(exportState.active) exportState.active = false;
-  if(!S.audioClips.length && await exportVideoMp4Wasm(scale)) return;
+  if(!S.audioClips.length && await exportVideoMp4Wasm(scale)){ console.log("export: WASM OK"); return; }
   if(exportState.active) exportState.active = false;
+  console.log("export: MediaRecorder fallback");
   await exportVideoRecorder(scale);
 }
-
 
 function showExportOverlay(label){
   document.getElementById("exportLabel").textContent = label;
@@ -5970,6 +6199,7 @@ function renderTimeline(){
     else if(rangeAnchor === f) hcls += " in-range";
     const h = el("div", hcls, String(f+1));
     h.dataset.frame = String(f);
+    if((S.cameraKeyframes||[]).some(k=>k.frame===f)) h.style.boxShadow = "inset 0 -3px 0 #00f5d4";
     attachFrameSelection(h, f);
     h.onclick = () => { if(consumeRangeClick()) return; S.frame = f; renderAll(); };
     colHeads.appendChild(h);
@@ -6610,6 +6840,7 @@ function buildShapeThumb(shape, isActive, obj){
 function renderObjectPanel(){
   const root = document.getElementById("panelContent");
   root.innerHTML = "";
+  if(S.camPanel){ root.appendChild(buildCameraPanel()); return; }
   if(S.tool !== "select") return;
   if(S.imageObjects.length === 0) return;
 
@@ -7178,7 +7409,7 @@ document.getElementById("audioInput").addEventListener("change", e => {
   });
   e.target.value = "";
 });
-document.getElementById("btnImportVideo").onclick = () => { document.getElementById("videoInput").click(); };
+document.getElementById("btnImportVideo").onclick = () =>  { document.getElementById("videoInput").click(); };
 document.getElementById("videoInput").addEventListener("change", e => {
   const file = e.target.files && e.target.files[0];
   importVideoFile(file).catch(err => {
@@ -7187,6 +7418,7 @@ document.getElementById("videoInput").addEventListener("change", e => {
   });
   e.target.value = "";
 });
+document.getElementById("btnCameraMenu").onclick = () => { S.camPanel = !S.camPanel; renderAll(); };
 document.getElementById("shapeInput").addEventListener("change", e => {
   const file = e.target.files && e.target.files[0];
   const targetId = pendingShapeTargetObjId;
