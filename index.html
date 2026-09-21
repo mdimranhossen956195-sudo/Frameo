@@ -307,6 +307,9 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-y;-webk
     <button id="btnImportAudio" class="more-menu-item">
       <span class="mmi-icon">🎵</span><span class="mmi-label">Audio</span><span class="mmi-chevron">›</span>
     </button>
+    <button id="btnVoiceRec" class="more-menu-item">
+      <span class="mmi-icon">🎙</span><span class="mmi-label">Voice</span><span class="mmi-chevron">›</span>
+    </button>
     <button id="btnImportGallery" class="more-menu-item">
       <span class="mmi-icon">🖼️</span><span class="mmi-label">photo</span><span class="mmi-chevron">›</span>
     </button>
@@ -1664,7 +1667,13 @@ function drawImageObjectsForLayer(ctx, imageObjects, layerId, layerOpacity, fram
     ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
     const ox = (t.flipX ? -(1-pv.px) : -pv.px)*dw;
     const oy = (t.flipY ? -(1-pv.py) : -pv.py)*dh;
-    ctx.drawImage(img, ox, oy, dw, dh);
+    // শেপের নিজস্ব ছবির মাপ অনুযায়ী আঁকা (নইলে base-এর বাক্সে চেপে যায়)
+    let sw = dw, sh = dh;
+    if(shape.id !== "base" && o.natW > 0 && o.natH > 0 && shape.natW > 0 && shape.natH > 0){
+      sw = dw * shape.natW / o.natW;
+      sh = dh * shape.natH / o.natH;
+    }
+    ctx.drawImage(img, ox + (dw - sw)/2, oy + (dh - sh)/2, sw, sh);
     ctx.restore();
   });
 }
@@ -1696,6 +1705,7 @@ function cameraAt(frame){
 }
 
 function setCamKf(patch){
+pushCamUndo();
   const list = S.cameraKeyframes || (S.cameraKeyframes = []);
   let k = camKfAt(S.frame);
   const isNew = !k;
@@ -1743,7 +1753,7 @@ add("SHAKE", 0, 100, 1, Math.round(cur.shake||0), v => setCamKf({ shake: v }));
       if(k.easing === n) o.selected = true;
       sel.appendChild(o);
     });
-    sel.onchange = e => { k.easing = e.target.value; autosave(); };
+    sel.onchange = e => { pushCamUndo(true); k.easing = e.target.value; autosave(); };
     panel.appendChild(sel);
   }
 
@@ -1753,6 +1763,7 @@ add("SHAKE", 0, 100, 1, Math.round(cur.shake||0), v => setCamKf({ shake: v }));
   del.disabled = !has;
   del.style.opacity = has ? "1" : ".4";
   del.onclick = () => {
+  pushCamUndo(true);
     S.cameraKeyframes = S.cameraKeyframes.filter(x => x.frame !== S.frame);
     autosave(); renderAll();
   };
@@ -2016,36 +2027,73 @@ function commit(mutator){
   renderUndoRedo();
 }
 
-function undo(){
-  if(!past.length) return;
-  future.push({
-    layers: S.layers,
-    imageObjects: S.imageObjects,
-    viewKeyframes: S.viewKeyframes
-  });
-  const prev = past.pop();
-  S.layers = prev.layers;
-  S.imageObjects = prev.imageObjects;
-  if(prev.viewKeyframes !== undefined) S.viewKeyframes = prev.viewKeyframes;
+let lastCamUndoAt = 0;
+
+function copyCam(){ return (S.cameraKeyframes || []).map(k => ({ ...k })); }
+function copyAudio(){ return S.audioClips.map(c => ({ ...c })); }
+
+// ক্যামেরা স্লাইডার টানলে একটানা বদলকে একটাই undo ধাপ ধরা হয়
+function pushCamUndo(force){
+  const now = Date.now();
+  const quick = now - lastCamUndoAt < 600;
+  lastCamUndoAt = now;
+  if(quick && !force) return;
+  past.push({ layers: S.layers, imageObjects: cloneImageObjects(S.imageObjects), cameraKeyframes: copyCam() });
+  if(past.length > 40) past.shift();
+  future = [];
+  renderUndoRedo();
+}
+
+function pushAudioUndo(){
+  past.push({ layers: S.layers, imageObjects: cloneImageObjects(S.imageObjects), audioClips: copyAudio() });
+  if(past.length > 40) past.shift();
+  future = [];
+  renderUndoRedo();
+}
+
+// entry-তে যা যা আছে, বর্তমান অবস্থা থেকেও ঠিক সেগুলোই নেওয়া হয়
+function currentLike(entry){
+  const cur = { layers: S.layers, imageObjects: S.imageObjects, viewKeyframes: S.viewKeyframes };
+  if(entry.cameraKeyframes !== undefined) cur.cameraKeyframes = copyCam();
+  if(entry.audioClips !== undefined) cur.audioClips = copyAudio();
+  return cur;
+}
+
+function applyEntry(entry){
+  S.layers = entry.layers;
+  S.imageObjects = entry.imageObjects;
+  if(entry.viewKeyframes !== undefined) S.viewKeyframes = entry.viewKeyframes;
+  if(entry.cameraKeyframes !== undefined){
+    S.cameraKeyframes = entry.cameraKeyframes.map(k => ({ ...k }));
+  }
+  if(entry.audioClips !== undefined){
+    stopAudioPlayback();
+    S.audioClips = entry.audioClips.map(c => ({ ...c }));
+    S.audioClips.forEach(refreshClipFrames);
+    if(!S.audioClips.some(c => c.id === S.selectedAudioClipId)){
+      S.selectedAudioClipId = null;
+      S.audioSplitFrame = null;
+    }
+    saveAudioClips(true);
+  }
   S.selectedObjectId = null;
+  lastCamUndoAt = 0;
   autosave();
   renderAll();
 }
 
+function undo(){
+  if(!past.length) return;
+  const prev = past.pop();
+  future.push(currentLike(prev));
+  applyEntry(prev);
+}
+
 function redo(){
   if(!future.length) return;
-  past.push({
-    layers: S.layers,
-    imageObjects: S.imageObjects,
-    viewKeyframes: S.viewKeyframes
-  });
   const next = future.pop();
-  S.layers = next.layers;
-  S.imageObjects = next.imageObjects;
-  if(next.viewKeyframes !== undefined) S.viewKeyframes = next.viewKeyframes;
-  S.selectedObjectId = null;
-  autosave();
-  renderAll();
+  past.push(currentLike(next));
+  applyEntry(next);
 }
 /* ---------- IndexedDB (অডিও ক্লিপ) ---------- */
 const AUDIO_DB_BASE = "frameo-studio-audio";
@@ -2069,7 +2117,7 @@ function openAudioDb(){
   return audioDbPromise;
 }
 function audioClipSignature(){
-  return S.audioClips.map(c => [c.id, c.startFrame, c.trimStart, c.trimEnd, c.volume, c.fileName].join(":")).join("|");
+  return S.audioClips.map(c => [c.id, c.startFrame, c.trimStart, c.trimEnd, c.volume, c.fileName, c.fx || ""].join(":")).join("|");
 }
 let lastAudioSignature = null;
 /* IndexedDB থেকে অডিও ফিরে আসার আগে কখনোই সেভ করা যাবে না —
@@ -2089,6 +2137,7 @@ async function saveAudioClips(force){
       fileType: c.fileType || "",
       fileBytes: c.fileBytes || null,
       samples: c.samples,
+      fx: c.fx || "",
       sampleRate: c.sampleRate,
       fileDuration: c.fileDuration,
       startFrame: c.startFrame,
@@ -2131,6 +2180,7 @@ async function restoreAudioClips(){
     return clip;
   });
   lastAudioSignature = audioClipSignature();
+  await refreshAllFx();
   audioRestoreDone = true;
   let need = 0;
   S.audioClips.forEach(c => { need = Math.max(need, clipEndFrame(c)); });
@@ -2335,6 +2385,7 @@ function autosaveSnapshot(){
     charView: S.charView,
     charViewList: S.charViewList,
     viewKeyframes: S.viewKeyframes,
+    cameraKeyframes: S.cameraKeyframes,
     // session / UI অবস্থা
     frame: S.frame,
     activeLayer: S.activeLayer,
@@ -2406,6 +2457,7 @@ function tryRestore(){
 if(typeof data.charView === "string") S.charView = data.charView;
       if(Array.isArray(data.charViewList) && data.charViewList.length) S.charViewList = data.charViewList;
       if(Array.isArray(data.viewKeyframes)) S.viewKeyframes = data.viewKeyframes;
+      if(Array.isArray(data.cameraKeyframes)) S.cameraKeyframes = data.cameraKeyframes;
       // session / UI অবস্থা
       if(TOOLS.some(t => t.id === data.tool) && data.tool !== "settings") S.tool = data.tool;
       if(typeof data.color === "string") S.color = data.color;
@@ -4719,10 +4771,13 @@ function focusLayer(){
 function makeAudioBuffer(clip){
   const ctx = ensureAudioCtx();
   if(!ctx) return null;
-  if(clip._buffer && clip._buffer.sampleRate === clip.sampleRate) return clip._buffer;
-  const buf = ctx.createBuffer(1, clip.samples.length, clip.sampleRate);
-  buf.copyToChannel(clip.samples, 0);
+  const smp = clip._fxSamples || clip.samples;
+  const tag = clip._fxSamples ? (clip.fx || "") : "";
+  if(clip._buffer && clip._buffer.sampleRate === clip.sampleRate && clip._bufferFx === tag) return clip._buffer;
+  const buf = ctx.createBuffer(1, smp.length, clip.sampleRate);
+  buf.copyToChannel(smp, 0);
   clip._buffer = buf;
+  clip._bufferFx = tag;
   return buf;
 }
 
@@ -4776,7 +4831,7 @@ function endAudioScrub(){
 }
 
 
-async function importAudioFile(file){
+async function importAudioFile(file, opts){
   if(!file) return;
 
   const ctx = ensureAudioCtx();
@@ -4805,7 +4860,12 @@ async function importAudioFile(file){
   // নতুন ক্লিপ শেষ ক্লিপের পরে বসাও (ওভারল্যাপ এড়াতে)
   let startFrame = 0;
   S.audioClips.forEach(c => { startFrame = Math.max(startFrame, clipEndFrame(c)); });
-
+if(opts && Number.isFinite(opts.startFrame)){
+    const want = opts.startFrame;
+    const dur = Math.max(1, Math.round(decoded.duration*S.fps));
+    const overlap = S.audioClips.some(c => want < clipEndFrame(c) && want + dur > c.startFrame);
+    if(!overlap) startFrame = want;
+  }
   const clip = {
     id: uid(),
     src: objectUrl,
@@ -4834,11 +4894,422 @@ async function importAudioFile(file){
   renderAll();
   saveAudioClips(true);
 }
+/* ---------- অটো লিপ-সিঙ্ক ---------- */
+const LIPSYNC_SILENCE    = 0.10; // বাড়ালে মুখ কম নড়বে
+const LIPSYNC_RANGE_DB   = 26;   // কমালে মুখ বেশি লাফাবে
+const LIPSYNC_BRIGHT_W   = 0.5;  // 0 = শুধু ভলিউম
+const LIPSYNC_ROUND_LOUD = 0.20; // এর চেয়ে আস্তে ফ্রেমে গোল শেপ বসবে না
 
+function lipsyncPlan(clip, ladder, roundId){
+  const c01  = x => Math.max(0, Math.min(1, x));
+  const sr   = clip.sampleRate || 44100;
+  const smp  = clip.samples;
+  const fps  = S.fps;
+  const durF = clipDurationFrames(clip);
 
+  const base   = Math.max(0, Math.floor(clip.trimStart*sr));
+  const endIdx = Math.min(smp.length, Math.ceil(clip.trimEnd*sr));
+  if(endIdx - base < 32) return null;
+
+  // নিচু ফ্রিকোয়েন্সির কপি (ও/উ ধ্বনি ধরার জন্য)
+  const lp = new Float32Array(endIdx - base);
+  const alpha = 1 - Math.exp(-2*Math.PI*1000/sr);
+  let y1 = 0, y2 = 0;
+  for(let i=0; i<lp.length; i++){
+    y1 += alpha*(smp[base+i] - y1);
+    y2 += alpha*(y1 - y2);
+    lp[i] = y2;
+  }
+
+  const rms    = new Float32Array(durF);
+  const bright = new Float32Array(durF);
+  const low    = new Float32Array(durF);
+
+  for(let k=0; k<durF; k++){
+    const a = Math.max(base, Math.floor((clip.trimStart + k/fps)*sr));
+    const b = Math.min(endIdx, Math.floor((clip.trimStart + (k+1)/fps)*sr));
+    if(b - a < 16) continue;
+    let e = 0, d = 0, le = 0;
+    for(let i=a+1; i<b; i++){
+      const x = smp[i], dx = x - smp[i-1], lx = lp[i-base];
+      e += x*x; d += dx*dx; le += lx*lx;
+    }
+    const n = b - a - 1;
+    rms[k] = Math.sqrt(e/n);
+    if(e > 1e-9){
+      const centroid = Math.sqrt(d/e)*sr/(2*Math.PI);
+      bright[k] = c01((centroid - 800)/2700);
+      low[k] = Math.min(1, le/e);
+    }
+  }
+
+  const sorted = Array.from(rms).sort((x,y) => y-x);
+  const ref = sorted[Math.min(sorted.length-1, Math.floor(sorted.length*0.1))];
+  if(!(ref > 0.001)) return null;
+
+  const out = new Array(durF).fill(null);
+  const vol = new Float32Array(durF);
+  const voiced = [];
+  for(let k=0; k<durF; k++){
+    vol[k] = rms[k]/ref;
+    if(vol[k] < LIPSYNC_SILENCE) out[k] = "base";
+    else voiced.push(k);
+  }
+  if(!voiced.length) return null;
+
+  // ১) গোল শেপ: সবচেয়ে "নিচু-ধ্বনির" ফ্রেমগুলো, সমান ভাগ পর্যন্ত
+  const nShapes = ladder.length + (roundId ? 1 : 0);
+  if(roundId){
+    let cand = voiced.filter(k => vol[k] >= LIPSYNC_ROUND_LOUD);
+    if(!cand.length) cand = voiced.slice();
+    cand.sort((p,q) => low[q] - low[p]);
+    const cnt = Math.min(cand.length, Math.max(1, Math.round(voiced.length/nShapes)));
+    for(let i=0; i<cnt; i++) out[cand[i]] = roundId;
+  }
+
+  // ২) বাকি ফ্রেম: মুখ কতটা খোলা তার ক্রমে সব শেপে সমান ভাগ
+  const rest = voiced.filter(k => out[k] === null);
+  const nL = ladder.length;
+  if(!nL){
+    rest.forEach(k => { out[k] = roundId || "base"; });
+    return out;
+  }
+  const open = new Float32Array(durF);
+  rest.forEach(k => {
+    const db = 20*Math.log10(Math.min(vol[k], 1.5));
+    const loud = c01(1 + db/LIPSYNC_RANGE_DB);
+    open[k] = loud*(1 - LIPSYNC_BRIGHT_W*bright[k]);
+  });
+  rest.sort((p,q) => (open[p] - open[q]) || (p - q));
+  rest.forEach((k, r) => {
+    out[k] = ladder[Math.min(nL-1, Math.floor(r*nL/rest.length))];
+  });
+  return out;
+}
+
+function applyLipSync(obj, clip, roundId){
+  const all = (obj.shapes || []).map(s => s.id);
+  if(!all.length){ alert("আগে অন্তত একটা শেপ যোগ করুন (মূল = বন্ধ মুখ)।"); return; }
+  if(!clip.samples || !clip.samples.length){ alert("এই ক্লিপের অডিও ডেটা পাওয়া যায়নি।"); return; }
+
+  const round = (roundId && all.includes(roundId)) ? roundId : "";
+  const ladder = all.filter(id => id !== round);
+  const plan = lipsyncPlan(clip, ladder, round);
+  if(!plan){ alert("অডিওতে কোনো আওয়াজ পাওয়া যায়নি।"); return; }
+
+  const start = clip.startFrame;
+  const end = Math.min(frameCount(), start + plan.length);
+  commit((ls, objs) => ({ imageObjects: objs.map(o => {
+    if(o.id !== obj.id) return o;
+    const kept = (o.shapeKeyframes || []).filter(k => k.frame < start || k.frame >= end);
+    const add = [];
+    for(let f=start; f<end; f++) add.push({ frame: f, shapeId: plan[f-start] });
+    return { ...o, shapeKeyframes: [...kept, ...add] };
+  }) }));
+  S.frame = start;
+  renderAll();
+}
+
+function clearAllShapeChanges(obj){
+  commit((ls, objs) => ({ imageObjects: objs.map(o => o.id !== obj.id ? o : { ...o, shapeKeyframes: [] }) }));
+  renderAll();
+}
+
+// ছবির আকার দেখে সবচেয়ে গোল শেপটা আন্দাজ (না পেলে "")
+function guessRoundShape(obj){
+  const list = (obj.shapes || [])
+    .filter(s => s.natW && s.natH)
+    .map(s => ({ id: s.id, r: s.natW / s.natH }))
+    .sort((a, b) => a.r - b.r);
+  if(list.length < 2) return "";
+  const best = list[0], next = list[1];
+  if(best.r <= 1.4 && best.r <= next.r * 0.8) return best.id;
+  return "";
+}
+
+function startAutoLipSync(obj){
+  if(obj.isVideo){ alert("ভিডিও object-এ লিপ-সিঙ্ক হবে না।"); return; }
+  if((obj.shapes || []).length < 1){ alert("আগে অন্তত একটা শেপ যোগ করুন (মূল = বন্ধ মুখ)।"); return; }
+  const clips = [...S.audioClips].sort((a,b) => a.startFrame - b.startFrame);
+  if(!clips.length){ alert("আগে একটা অডিও বা ভয়েস যোগ করুন।"); return; }
+
+  const roundId = (obj.shapes || []).length >= 2 ? guessRoundShape(obj) : "";
+  if(clips.length === 1){ applyLipSync(obj, clips[0], roundId); return; }
+
+  const old = document.getElementById("lipOverlay");
+  if(old) old.remove();
+  const ov = document.createElement("div");
+  ov.id = "lipOverlay";
+  ov.className = "export-overlay";
+  const panel = el("div", "panel");
+  panel.style.cssText = "max-width:320px;width:92%;max-height:80vh;overflow-y:auto;text-align:left;";
+  panel.appendChild(el("div", "font-display", "কোন অডিওর সাথে মেলাবেন?"));
+  clips.forEach(c => {
+    const b = el("button", "chip w-full", `${c.fileName} (ফ্রেম ${c.startFrame+1}–${clipEndFrame(c)})`);
+    b.style.marginTop = ".4rem";
+    b.onclick = () => { ov.remove(); applyLipSync(obj, c, roundId); };
+    panel.appendChild(b);
+  });
+  const close = el("button", "chip w-full", "Close");
+  close.style.marginTop = ".6rem";
+  close.onclick = () => ov.remove();
+  panel.appendChild(close);
+  ov.appendChild(panel);
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+}
+/* ---------- Voice FX ---------- */
+const FX_PRESETS = [
+  { id:"", label:"আসল কণ্ঠ", steps:[] },
+  { id:"woman", label:"👩 মেয়ে", steps:[{t:"pitch",r:1.3}] },
+  { id:"child", label:"🧒 বাচ্চা", steps:[{t:"pitch",r:1.6}] },
+  { id:"chipmunk", label:"🐿 চিপমাঙ্ক", steps:[{t:"pitch",r:2.0}] },
+  { id:"man", label:"🧔 ভারী পুরুষ", steps:[{t:"pitch",r:0.78}] },
+  { id:"giant", label:"👹 দৈত্য", steps:[{t:"pitch",r:0.6}] },
+  { id:"robot", label:"🤖 রোবট", steps:[{t:"ring",hz:55}] },
+  { id:"alien", label:"👽 এলিয়েন", steps:[{t:"pitch",r:1.4},{t:"ring",hz:30}] },
+  { id:"echo", label:"🔁 ইকো", steps:[{t:"echo",delay:0.28,fb:0.45}] },
+  { id:"reverb", label:"🏛 হল/গুহা", steps:[{t:"reverb"}] },
+  { id:"phone", label:"📞 টেলিফোন", steps:[{t:"hp",hz:300},{t:"hp",hz:300},{t:"lp",hz:3400},{t:"lp",hz:3400},{t:"gain",g:1.6}] },
+  { id:"water", label:"🌊 পানির নিচে", steps:[{t:"lp",hz:500},{t:"lp",hz:500},{t:"gain",g:2.5}] },
+  { id:"ghost", label:"👻 ভুতুড়ে", steps:[{t:"pitch",r:0.8},{t:"reverb"},{t:"echo",delay:0.35,fb:0.4}] }
+];
+
+function fxPreset(id){ return FX_PRESETS.find(p => p.id === id) || FX_PRESETS[0]; }
+
+// গতি না বদলে পিচ বদল (grain পদ্ধতি) — কার্টুন কণ্ঠের জন্য যথেষ্ট
+function fxPitch(x, r, sr){
+  const N = x.length;
+  const G = Math.max(256, Math.round(0.06*sr));
+  const H = G >> 1;
+  const half = G >> 1;
+  const out = new Float32Array(N);
+  const win = new Float32Array(G);
+  for(let j=0; j<G; j++) win[j] = 0.5 - 0.5*Math.cos(2*Math.PI*j/G);
+  for(let start = -H; start < N; start += H){
+    for(let j=0; j<G; j++){
+      const o = start + j;
+      if(o < 0 || o >= N) continue;
+      const p = start + half + (j - half)*r;
+      if(p < 0 || p >= N-1) continue;
+      const i0 = p | 0, f = p - i0;
+      out[o] += win[j] * (x[i0]*(1-f) + x[i0+1]*f);
+    }
+  }
+  return out;
+}
+
+function fxStep(x, sr, s){
+  if(s.t === "pitch") return fxPitch(x, s.r, sr);
+  const N = x.length;
+  const y = new Float32Array(N);
+  if(s.t === "ring"){
+    const w = 2*Math.PI*s.hz/sr;
+    for(let i=0; i<N; i++) y[i] = x[i]*Math.sin(w*i)*1.4;
+  } else if(s.t === "echo"){
+    const d = Math.max(1, Math.round(s.delay*sr));
+    for(let i=0; i<N; i++) y[i] = x[i] + (i >= d ? s.fb*y[i-d] : 0);
+  } else if(s.t === "reverb"){
+    const ds = [0.0297, 0.0371, 0.0411, 0.0437].map(v => Math.round(v*sr));
+    const bufs = ds.map(d => new Float32Array(d));
+    const g = 0.78;
+    for(let i=0; i<N; i++){
+      let sum = 0;
+      for(let k=0; k<4; k++){
+        const idx = i % ds[k];
+        const c = x[i] + g*bufs[k][idx];
+        bufs[k][idx] = c;
+        sum += c;
+      }
+      y[i] = 0.7*x[i] + (1-g)*0.22*sum;
+    }
+  } else if(s.t === "lp"){
+    const rc = 1/(2*Math.PI*s.hz), dt = 1/sr, a = dt/(rc+dt);
+    let p = 0;
+    for(let i=0; i<N; i++){ p += a*(x[i]-p); y[i] = p; }
+  } else if(s.t === "hp"){
+    const rc = 1/(2*Math.PI*s.hz), dt = 1/sr, a = rc/(rc+dt);
+    let py = 0, px = 0;
+    for(let i=0; i<N; i++){ py = a*(py + x[i] - px); px = x[i]; y[i] = py; }
+  } else if(s.t === "gain"){
+    for(let i=0; i<N; i++) y[i] = x[i]*s.g;
+  } else {
+    y.set(x);
+  }
+  return y;
+}
+
+function fxRender(samples, sr, steps){
+  let x = samples;
+  for(const s of steps) x = fxStep(x, sr, s);
+  if(x === samples) return x;
+  let peak = 0;
+  for(let i=0; i<x.length; i++){ const a = Math.abs(x[i]); if(a > peak) peak = a; }
+  if(peak > 0.98){
+    const k = 0.98/peak;
+    for(let i=0; i<x.length; i++) x[i] *= k;
+  }
+  return x;
+}
+
+const fxCache = new WeakMap(); // samples -> { id, out }
+
+async function computeClipFx(clip){
+  clip._fxSamples = null;
+  clip._buffer = null;
+  const p = fxPreset(clip.fx || "");
+  if(!p.steps.length || !clip.samples || !clip.samples.length) return;
+  let ent = fxCache.get(clip.samples);
+  if(!ent || ent.id !== p.id){
+    await new Promise(r => setTimeout(r, 30));
+    ent = { id: p.id, out: fxRender(clip.samples, clip.sampleRate || 44100, p.steps) };
+    fxCache.set(clip.samples, ent);
+  }
+  clip._fxSamples = ent.out;
+}
+
+async function refreshAllFx(){
+  for(const c of S.audioClips){
+    if(c.fx){ try{ await computeClipFx(c); }catch(e){ console.warn("fx failed", e); } }
+  }
+}
+
+async function setClipFx(clipId, fxId){
+  const clip = S.audioClips.find(c => c.id === clipId);
+  if(!clip) return;
+  if(typeof pushAudioUndo === "function") pushAudioUndo();
+  stopAudioPlayback();
+  clip.fx = fxId || "";
+  showExportOverlay("ইফেক্ট বসানো হচ্ছে…");
+  try{ await computeClipFx(clip); }
+  catch(e){ console.error(e); alert("ইফেক্ট বসানো যায়নি।"); }
+  hideExportOverlay();
+  renderAll();
+  saveAudioClips(true);
+}
+
+function openVoiceFxPanel(){
+  const clip = selectedAudioClip();
+  if(!clip){ alert("আগে টাইমলাইনে একটা অডিও ক্লিপ সিলেক্ট করুন।"); return; }
+  const old = document.getElementById("fxOverlay");
+  if(old) old.remove();
+  const ov = document.createElement("div");
+  ov.id = "fxOverlay";
+  ov.className = "export-overlay";
+  const panel = el("div", "panel");
+  panel.style.cssText = "max-width:320px;width:92%;max-height:80vh;overflow-y:auto;text-align:left;";
+  panel.appendChild(el("div", "font-display", "Voice FX"));
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.6rem;";
+  FX_PRESETS.forEach(p => {
+    const b = el("button", "chip" + ((clip.fx || "") === p.id ? " chip-accent" : ""), p.label);
+    b.onclick = () => { ov.remove(); setClipFx(clip.id, p.id); };
+    grid.appendChild(b);
+  });
+  panel.appendChild(grid);
+  const close = el("button", "chip w-full", "Close");
+  close.style.marginTop = ".6rem";
+  close.onclick = () => ov.remove();
+  panel.appendChild(close);
+  ov.appendChild(panel);
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+}
+/* ---------- ভয়েস রেকর্ড ---------- */
+let voiceRec = null;
+
+function fmtSec(s){
+  const m = Math.floor(s/60), r = Math.floor(s%60);
+  return m + ":" + String(r).padStart(2, "0");
+}
+
+function renderVoiceBar(){
+  let bar = document.getElementById("voiceBar");
+  if(!voiceRec){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement("button");
+    bar.id = "voiceBar";
+    bar.style.cssText = "position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:500;border:0;border-radius:999px;padding:.55rem 1rem;background:#d9284a;color:#fff;font-weight:700;font-size:.8rem;box-shadow:0 6px 20px rgba(0,0,0,.5);";
+    bar.onclick = stopVoiceRecording;
+    document.body.appendChild(bar);
+  }
+  bar.textContent = "⏺ রেকর্ড হচ্ছে " + fmtSec((Date.now() - voiceRec.t0)/1000) + " — থামাতে ট্যাপ করুন";
+}
+
+async function startVoiceRecording(){
+  if(voiceRec || exportState.active) return;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
+    alert("এই ব্রাউজারে ভয়েস রেকর্ড সাপোর্ট করে না।");
+    return;
+  }
+  if(S.audioClips.length && !confirm("ইয়ারফোন পরে নিন, নইলে স্পিকারের আওয়াজ রেকর্ডে ঢুকে যাবে। শুরু করবেন?")) return;
+
+  let stream;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  }catch(e){
+    alert("মাইকের অনুমতি পাওয়া যায়নি। ব্রাউজার সেটিংসে মাইক Allow করুন।");
+    return;
+  }
+
+  const mimes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  const mime = mimes.find(m => MediaRecorder.isTypeSupported(m)) || "";
+  let recorder;
+  try{ recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+  catch(e){
+    stream.getTracks().forEach(t => t.stop());
+    alert("রেকর্ডার চালু করা যায়নি।");
+    return;
+  }
+
+  const chunks = [];
+  recorder.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+
+  const info = { recorder, t0: Date.now(), startFrame: S.frame, prevLoop: S.loop, timer: null };
+  voiceRec = info;
+
+  recorder.onstop = async () => {
+    clearInterval(info.timer);
+    stream.getTracks().forEach(t => t.stop());
+    voiceRec = null;
+    renderVoiceBar();
+    if(S.playing){ S.playing = false; stopPlayback(); stopAudioPlayback(); }
+    S.loop = info.prevLoop;
+    renderAll();
+
+    const type = (recorder.mimeType || mime || "audio/webm").split(";")[0];
+    const blob = new Blob(chunks, { type });
+    if(!blob.size){ alert("কিছু রেকর্ড হয়নি।"); return; }
+    const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
+    const file = new File([blob], "voiceover-" + Date.now() + "." + ext, { type });
+    try{
+      await importAudioFile(file, { startFrame: info.startFrame });
+    }catch(err){
+      console.error("ভয়েস ইমপোর্ট ব্যর্থ:", err);
+      alert("রেকর্ড যোগ করতে সমস্যা হয়েছে: " + (err && err.message ? err.message : String(err)));
+    }
+  };
+
+  recorder.start(1000);
+  info.timer = setInterval(renderVoiceBar, 500);
+  renderVoiceBar();
+
+  // অ্যানিমেশন চালিয়ে রেকর্ড — লুপ বন্ধ, নইলে শেষে ফিরে যাবে
+  S.loop = false;
+  S.playing = true;
+  startPlayback();
+  startAudioPlaybackFromFrame(S.frame);
+  renderAll();
+}
+
+function stopVoiceRecording(){
+  if(!voiceRec) return;
+  try{ voiceRec.recorder.stop(); }catch(e){}
+}
 function removeAudioClip(clipId){
   const clip = S.audioClips.find(c=>c.id===clipId);
   if(!clip) return;
+  pushAudioUndo();
   const stillUsed = S.audioClips.some(c => c.id!==clipId && c.objectUrl===clip.objectUrl);
   if(clip.objectUrl && !stillUsed){ try{ URL.revokeObjectURL(clip.objectUrl); }catch(e){} }
   S.audioClips = S.audioClips.filter(c=>c.id!==clipId);
@@ -4855,7 +5326,7 @@ function splitAudioClipAtFrame(clipId, frame){
   const clip = S.audioClips[idx];
   const rel = frame - clip.startFrame;
   if(rel<=0 || rel>=clipDurationFrames(clip)) return;
-
+pushAudioUndo();
   const cutSec = clip.trimStart + rel/S.fps;
   const left = { ...clip, id: uid(), trimEnd: cutSec, _buffer: clip._buffer };
   const right = { ...clip, id: uid(), trimStart: cutSec, startFrame: frame, _buffer: clip._buffer };
@@ -4921,6 +5392,7 @@ function mixdownAudio(totalFrames, targetRate){
   const out = new Float32Array(outLen);
 
   S.audioClips.forEach(clip => {
+    if(clip._fxSamples) clip = { ...clip, samples: clip._fxSamples };
     const sr = clip.sampleRate || sampleRate;
     const ratio = sr / sampleRate;
     const startIdx = Math.round((clip.startFrame/S.fps)*sampleRate);
@@ -5293,7 +5765,7 @@ async function exportPng(transparent){
   off.width = STAGE_W;
   off.height = STAGE_H;
   const ctx = off.getContext("2d");
-  if(!ctx) return;
+ if(!ctx) return;
 
   if(transparent){
     // ব্যাকগ্রাউন্ড ফিল না করে সরাসরি লেয়ার/ইমেজ অবজেক্ট আঁকা
@@ -5335,7 +5807,7 @@ function downloadBlob(blob, name){
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-const SCALE_1080 = 1.5; // 1280 × 1.5 = 1920×1080
+const SCALE_1080 = 1; // 1280×720
 const SCALE_4K   = 3;   // 1280 × 3   = 3840×2160
 const isHD = scale => scale <= SCALE_1080;
 
@@ -5344,43 +5816,51 @@ function mp4FileName(scale){
 }
 
 async function pickAvcCodec(w, h, fps, bitrate){
-  const candidates = ["avc1.640034","avc1.640033","avc1.64002A","avc1.4D0033","avc1.42E03E"];
-  for(const codec of candidates){
-    try{
-      const support = await VideoEncoder.isConfigSupported({
-        codec, width:w, height:h, framerate:fps, bitrate,
-        avc:{ format:"avc" }
-      });
-      if(support && support.supported) return codec;
-    }catch(e){}
+  const candidates = [
+    "avc1.640034","avc1.640033","avc1.64002A","avc1.4D0033",
+    "avc1.42E03E","avc1.42E01F","avc1.42E01E","avc1.42001F","avc1.4D001F"
+  ];
+  const bitrates = [bitrate, Math.round(bitrate/2), 6000000, 4000000];
+  for(const br of bitrates){
+    for(const codec of candidates){
+      for(const fmt of ["avc", undefined]){
+        try{
+          const cfg = { codec, width:w, height:h, framerate:fps, bitrate:br };
+          if(fmt) cfg.avc = { format: fmt };
+          const s = await VideoEncoder.isConfigSupported(cfg);
+          if(s && s.supported) return { codec, bitrate: br, avcFormat: fmt };
+        }catch(e){}
+      }
+    }
   }
   return null;
 }
 
 // True MP4 (H.264 + AAC) export via WebCodecs + mp4-muxer, frame by frame.
 async function exportVideoMp4WebCodecs(scale){
-  if(typeof VideoEncoder === "undefined") return false;
+  if(typeof VideoEncoder === "undefined"){ alert("কারণ 1: VideoEncoder নেই"); return false; }
 
   const w = STAGE_W*scale;
   const h = STAGE_H*scale;
   const fps = S.fps;
   const bitrate = isHD(scale) ? 12000000 : 40000000;
-  const codec = await pickAvcCodec(w, h, fps, bitrate);
-if(!codec){ alert("কারণ: H.264 কোডেক সাপোর্ট নেই (" + w + "x" + h + ")"); return false; }
+  const picked = await pickAvcCodec(w, h, fps, bitrate);
+  if(!picked){ return false; }
+  const codec = picked.codec;
+  const useBitrate = picked.bitrate;
 
   let Muxer, ArrayBufferTarget;
   try{
     const mod = await import("https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/+esm");
     Muxer = mod.Muxer;
     ArrayBufferTarget = mod.ArrayBufferTarget;
-}catch(e){ alert("কারণ: mp4-muxer লোড হয়নি"); return false; }
-  if(!Muxer) return false;
-
+}catch(e){ alert("কারণ 3: mp4-muxer লোড হয়নি: " + e.message); return false; }
+  if(!Muxer){ alert("কারণ 4: Muxer পাওয়া যায়নি"); return false; }
   const off = document.createElement("canvas");
   off.width = w;
   off.height = h;
   const ctx = off.getContext("2d");
-  if(!ctx) return false;
+  if(!ctx){ alert("কারণ 5: canvas তৈরি হয়নি (" + w + "x" + h + ")"); return false; }
 
   let mixed = mixdownAudio(frameCount());
   let audioCodec = null;
@@ -5392,14 +5872,19 @@ if(!codec){ alert("কারণ: H.264 কোডেক সাপোর্ট ন
       return !!(s && s.supported);
     }catch(e){ return false; }
   };
-  if(mixed && typeof AudioEncoder !== "undefined"){
-    if(await tryCfg("mp4a.40.2", mixed.sampleRate)) audioCodec = "aac";
-    else if(await tryCfg("opus", 48000)){
+  if(mixed && typeof AudioEncoder === "undefined"){
+    alert("কারণ 6: AudioEncoder নেই");
+  } else if(mixed){
+    const aacOk = await tryCfg("mp4a.40.2", mixed.sampleRate);
+    const opusOk = await tryCfg("opus", 48000);
+    
+    if(aacOk) audioCodec = "aac";
+    else if(opusOk){
       mixed = mixdownAudio(frameCount(), 48000);
       audioCodec = "opus";
     }
   }
-  if(S.audioClips.length && !audioCodec){ alert("কারণ: অডিও এনকোডার সাপোর্ট নেই"); return false; }
+  if(S.audioClips.length && !audioCodec){ alert("কারণ 7: অডিও এনকোডার সাপোর্ট নেই"); return false; }
 
   const audioOk = !!audioCodec;
   const samples = mixed ? mixed.samples : null;
@@ -5418,7 +5903,7 @@ if(!codec){ alert("কারণ: H.264 কোডেক সাপোর্ট ন
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
     error: (e) => { videoError = e; console.error("VideoEncoder error:", e); }
   });
-  videoEncoder.configure({ codec, width:w, height:h, framerate:fps, bitrate, avc:{ format:"avc" } });
+ videoEncoder.configure({ codec, width:w, height:h, framerate:fps, bitrate:useBitrate, ...(picked.avcFormat ? { avc:{ format: picked.avcFormat } } : {}) });
 
   let audioError = null;
   let audioEncoder = null;
@@ -5433,18 +5918,11 @@ if(!codec){ alert("কারণ: H.264 কোডেক সাপোর্ট ন
     });
   }
 
-  function waitForQueue(encoder, max){
-    return new Promise(resolve => {
-      if(encoder.encodeQueueSize <= max) return resolve();
-      const onDequeue = () => {
-        if(encoder.encodeQueueSize <= max){
-          encoder.removeEventListener('dequeue', onDequeue);
-          resolve();
-        }
-      };
-      encoder.addEventListener('dequeue', onDequeue);
-    });
+  async function waitForQueue(encoder, max){
+  while(encoder.encodeQueueSize > max){
+    await new Promise(r => setTimeout(r, 5));
   }
+}
 
   exportState.active = true;
   showExportOverlay(audioOk ? "MP4 রেন্ডার হচ্ছে (অডিও সহ)…" : "MP4 রেন্ডার হচ্ছে…");
@@ -5533,6 +6011,7 @@ const videoTrack = videoStream.getVideoTracks()[0];
 
   let exportAudioCtx = null;
   let exportAudioSource = null;
+  let exportDest = null;
   let combinedStream = videoStream;
 
   const mixedRec = mixdownAudio(frameCount());
@@ -5548,7 +6027,7 @@ const videoTrack = videoStream.getVideoTracks()[0];
 
       const destNode = exportAudioCtx.createMediaStreamDestination();
       exportAudioSource.connect(destNode);
-
+exportDest = destNode;
       combinedStream = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...destNode.stream.getAudioTracks()
@@ -5569,8 +6048,8 @@ const videoTrack = videoStream.getVideoTracks()[0];
   const webmCandidates = hasAudioTrack
     ? ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
     : ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
-  const mime = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m))
-            || webmCandidates.find(m => MediaRecorder.isTypeSupported(m));
+  const mime = webmCandidates.find(m => MediaRecorder.isTypeSupported(m))
+            || mimeCandidates.find(m => MediaRecorder.isTypeSupported(m));
 
   if(!mime){ alert("এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট করে না।"); return; }
   const isWebm = mime.indexOf("webm") >= 0;
@@ -5583,7 +6062,7 @@ const videoTrack = videoStream.getVideoTracks()[0];
   rec.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
   const done = new Promise(res => rec.onstop = () => res());
 
-  rec.start();
+  rec.start(500);
   exportState.active = true;
   showExportOverlay("MP4 রেন্ডার হচ্ছে…");
 
@@ -5596,17 +6075,38 @@ const videoTrack = videoStream.getVideoTracks()[0];
     try{ exportAudioSource.start(0); }catch(e){}
   }
 
-  for(let i=0; i<frameCount(); i++){
-    await ensureFrameImagesDecoded(i);
-    renderFrame(ctx, S.layers, S.imageObjects, i, w, h, S.bg);
-    videoTrack.requestFrame();
-    showExportOverlay(`MP4 রেন্ডার হচ্ছে ${i+1}/${frameCount()}`);
-    await new Promise(r => setTimeout(r, Math.max(1000/S.fps, 40)));
+  const totalF = frameCount();
+  const totalMs = (totalF / S.fps) * 1000;
+  // আগে সব ফ্রেমের ছবি decode করে রাখি, যাতে রেকর্ডিং চলাকালীন দেরি না হয়
+  for(let i=0; i<totalF; i++){ await ensureFrameImagesDecoded(i); }
+  if(exportAudioSource){ try{ exportAudioSource.stop(); }catch(e){} }
+  // অডিও আবার নতুন করে শুরু, ঠিক ভিডিওর শুরুর সাথে
+  if(exportAudioCtx && mixedRec){
+    const buf2 = exportAudioCtx.createBuffer(1, mixedRec.samples.length, mixedRec.sampleRate);
+    buf2.copyToChannel(mixedRec.samples, 0);
+    exportAudioSource = exportAudioCtx.createBufferSource();
+    exportAudioSource.buffer = buf2;
+    exportAudioSource.connect(exportDest);
+    exportAudioSource.start(0);
   }
-
-  await new Promise(r => setTimeout(r, 200));
-  rec.stop();
-  await done;
+  const t0 = performance.now();
+let lastDrawn = -1;
+const HOLD_MS = 500; // শেষ ফ্রেম একটু বেশি ধরে রাখা
+while(true){
+  const elapsed = performance.now() - t0;
+  if(elapsed >= totalMs + HOLD_MS) break;
+  const fi = Math.min(totalF-1, Math.floor(elapsed / 1000 * S.fps));
+  if(fi !== lastDrawn){
+    renderFrame(ctx, S.layers, S.imageObjects, fi, w, h, S.bg);
+    lastDrawn = fi;
+    showExportOverlay(`রেকর্ড হচ্ছে ${fi+1}/${totalF}`);
+  }
+  videoTrack.requestFrame(); // প্রতি tick-এ, শুধু বদলালে নয়
+  await new Promise(r => requestAnimationFrame(r));
+}
+await new Promise(r => setTimeout(r, 300));
+rec.stop();
+await done;
 
   if(exportAudioSource){
     try{ exportAudioSource.stop(); }catch(e){}
@@ -5616,6 +6116,7 @@ const videoTrack = videoStream.getVideoTracks()[0];
   }
 
   const blob = new Blob(chunks, { type: mime });
+  
   downloadBlob(blob, isWebm ? mp4FileName(scale).replace(".mp4", ".webm") : mp4FileName(scale));
 
   exportState.active = false;
@@ -5686,14 +6187,13 @@ async function exportVideo(scale){
   try{
     if(await exportVideoMp4WebCodecs(scale)){ console.log("export: WebCodecs OK"); return; }
   }catch(e){ console.error("WebCodecs:", e); }
-  alert("WebCodecs এক্সপোর্ট ব্যর্থ — ফলব্যাকে যাচ্ছে (ফাইল ছোট হতে পারে)");
+  
   if(exportState.active) exportState.active = false;
   if(!S.audioClips.length && await exportVideoMp4Wasm(scale)){ console.log("export: WASM OK"); return; }
   if(exportState.active) exportState.active = false;
   console.log("export: MediaRecorder fallback");
-  await exportVideoRecorder(scale);
+  await exportVideoRecorder(1);
 }
-
 function showExportOverlay(label){
   document.getElementById("exportLabel").textContent = label;
   document.getElementById("exportOverlay").classList.remove("hidden");
@@ -6391,7 +6891,12 @@ function buildAudioTrackRow(fc){
     if(S.selectedAudioClipId) removeAudioClip(S.selectedAudioClipId);
   };
   head.appendChild(delBtn);
-
+const fxBtn = el("button", "visbtn", "🎛");
+  fxBtn.title = "Voice FX";
+  fxBtn.disabled = !sel;
+  fxBtn.style.opacity = sel ? "1" : ".4";
+  fxBtn.onclick = e => { e.stopPropagation(); openVoiceFxPanel(); };
+  head.appendChild(fxBtn);
   audioRow.appendChild(head);
 
   const lane = el("div", "audio-track-lane");
@@ -6422,7 +6927,7 @@ function buildAudioTrackRow(fc){
     box.appendChild(cv);
     drawClipWaveform(cv, clip, widthPx);
 
-    box.appendChild(el("div", "clip-name", clip.fileName));
+    box.appendChild(el("div", "clip-name", clip.fileName + (clip.fx ? " 🎛" : "")));
 
     const beginDrag = (e) => {
       e.stopPropagation();
@@ -6458,6 +6963,7 @@ function buildAudioTrackRow(fc){
         const dFrames = Math.round((ev.clientX - startX)/CELL_W);
         const next = clampClipStart(clip, origStart + dFrames);
         if(next !== clip.startFrame){
+          if(!moved) pushAudioUndo();
           moved = true;
           clip.startFrame = next;
           refreshClipFrames(clip);
@@ -7047,7 +7553,17 @@ panel.appendChild(groupField);
   shapeGrid.appendChild(addShapeBtn);
 
   shapeField.appendChild(shapeGrid);
+const lipBtn = el("button", "chip compact-btn w-full", "🎤 অটো লিপ-সিঙ্ক (অডিও থেকে)");
+  lipBtn.style.marginTop = ".4rem";
+  lipBtn.onclick = () => startAutoLipSync(obj);
+  shapeField.appendChild(lipBtn);
 
+  if((obj.shapeKeyframes || []).length){
+    const clrAll = el("button", "chip compact-btn chip-danger w-full", "সব শেপ-বদল মুছো");
+    clrAll.style.marginTop = ".35rem";
+    clrAll.onclick = () => clearAllShapeChanges(obj);
+    shapeField.appendChild(clrAll);
+  }
   if((obj.shapeKeyframes||[]).length){
     const curSk = (obj.shapeKeyframes||[]).find(k=>k.frame===S.frame);
     if(curSk){
@@ -7409,6 +7925,10 @@ document.getElementById("audioInput").addEventListener("change", e => {
   });
   e.target.value = "";
 });
+document.getElementById("btnVoiceRec").onclick = () => {
+  if(voiceRec) stopVoiceRecording();
+  else startVoiceRecording();
+};
 document.getElementById("btnImportVideo").onclick = () =>  { document.getElementById("videoInput").click(); };
 document.getElementById("videoInput").addEventListener("change", e => {
   const file = e.target.files && e.target.files[0];
@@ -7559,21 +8079,44 @@ function b64ToF32(b64){
     return new Float32Array(bytes.buffer);
   }catch(e){ return new Float32Array(0); }
 }
+function u8ToB64(u8){
+  let s = ""; const CH = 0x8000;
+  for(let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+  return btoa(s);
+}
+function b64ToU8(b64){
+  const bin = atob(b64 || "");
+  const u8 = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
 function encodeProjectForCloud(rec){
-  return {
-    ...rec,
-    audioClips: (rec.audioClips || []).map(c => ({ ...c, samples: { __f32: f32ToB64(c.samples) } }))
-  };
+  const files = {};
+  const clips = (rec.audioClips || []).map(c => {
+    const { samples, fileBytes, ...rest } = c;
+    if(fileBytes){
+      const key = `${c.fileName}|${fileBytes.byteLength}`;
+      if(!files[key]) files[key] = u8ToB64(new Uint8Array(fileBytes));
+      return { ...rest, fileKey: key };
+    }
+    return { ...rest, samples: { __f32: f32ToB64(samples) } };
+  });
+  return { ...rec, audioClips: clips, audioFiles: files };
 }
 function decodeProjectFromCloud(rec){
   if(!rec) return null;
-  return {
-    ...rec,
-    audioClips: (rec.audioClips || []).map(c => ({
-      ...c,
-      samples: c.samples && c.samples.__f32 !== undefined ? b64ToF32(c.samples.__f32) : new Float32Array(c.samples || [])
-    }))
-  };
+  const files = rec.audioFiles || {};
+  const cache = {};
+  const clips = (rec.audioClips || []).map(c => {
+    if(c.fileKey && files[c.fileKey]){
+      if(!cache[c.fileKey]) cache[c.fileKey] = b64ToU8(files[c.fileKey]).buffer;
+      return { ...c, fileBytes: cache[c.fileKey], samples: null };
+    }
+    return { ...c, samples: c.samples && c.samples.__f32 !== undefined
+      ? b64ToF32(c.samples.__f32) : new Float32Array(c.samples || []) };
+  });
+  const { audioFiles, ...rest } = rec;
+  return { ...rest, audioClips: clips };
 }
 async function getAccessToken(){
   const { data } = await sb.auth.getSession();
@@ -7761,17 +8304,7 @@ async function duplicateProject(id){
     updatedAt: Date.now(),
     layers: JSON.parse(JSON.stringify(base.layers)),
     imageObjects: JSON.parse(JSON.stringify(base.imageObjects)),
-    audioClips: (base.audioClips || []).map(c => ({
-      id: c.id,
-      fileName: c.fileName,
-      samples: c.samples instanceof Float32Array ? new Float32Array(c.samples) : new Float32Array(c.samples || []),
-      sampleRate: c.sampleRate,
-      fileDuration: c.fileDuration,
-      startFrame: c.startFrame,
-      trimStart: c.trimStart,
-      trimEnd: c.trimEnd,
-      volume: c.volume
-    }))
+    audioClips: (base.audioClips || []).map(c => ({ ...c })),
   };
   // ভিডিও object-এর জন্য নতুন id বানিয়ে ফ্রেমগুলো নতুন id-তে কপি করা
   const idMap = new Map();
@@ -7808,26 +8341,53 @@ function makeThumbnail(){
 
 function serializeAudioClips(){
   return S.audioClips.map(c => ({
-    id: c.id, fileName: c.fileName,
-    samples: c.samples ? new Float32Array(c.samples) : new Float32Array(0),
-    sampleRate: c.sampleRate,
-    fileDuration: c.fileDuration, startFrame: c.startFrame,
-    trimStart: c.trimStart, trimEnd: c.trimEnd, volume: c.volume
+    id: c.id, fileName: c.fileName, fileType: c.fileType || "",
+    fx: c.fx || "",
+    fileBytes: c.fileBytes || null,
+    samples: c.fileBytes ? null : (c.samples ? new Float32Array(c.samples) : new Float32Array(0)),
+    sampleRate: c.sampleRate, fileDuration: c.fileDuration,
+    startFrame: c.startFrame, trimStart: c.trimStart, trimEnd: c.trimEnd, volume: c.volume
   }));
 }
-function hydrateAudioClips(rows){
-  S.audioClips = (rows||[]).map(r => {
-    const clip = { ...r, src: null, objectUrl: null, _buffer: null,
-      samples: r.samples instanceof Float32Array ? r.samples : new Float32Array(r.samples || []) };
+async function hydrateAudioClips(rows){
+  const ctx = ensureAudioCtx();
+  const decoded = new Map();
+  const out = [];
+  for(const r of (rows || [])){
+    let samples = r.samples ? (r.samples instanceof Float32Array ? r.samples : new Float32Array(r.samples)) : null;
+    let sampleRate = r.sampleRate;
+    let objectUrl = null;
+    if(r.fileBytes){
+      try{ objectUrl = URL.createObjectURL(new Blob([r.fileBytes], { type: r.fileType || "audio/mpeg" })); }catch(e){}
+    }
+    if((!samples || !samples.length) && r.fileBytes && ctx){
+      let d = decoded.get(r.fileBytes);
+      if(!d){
+        try{
+          const buf = await ctx.decodeAudioData(r.fileBytes.slice(0));
+          const mono = new Float32Array(buf.length);
+          for(let ch = 0; ch < buf.numberOfChannels; ch++){
+            const data = buf.getChannelData(ch);
+            for(let i = 0; i < buf.length; i++) mono[i] += data[i] / buf.numberOfChannels;
+          }
+          d = { mono, sampleRate: buf.sampleRate };
+          decoded.set(r.fileBytes, d);
+        }catch(e){ console.warn("audio decode failed", e); }
+      }
+      if(d){ samples = d.mono; sampleRate = d.sampleRate; }
+    }
+    const clip = { ...r, src: objectUrl, objectUrl, _buffer: null,
+      samples: samples || new Float32Array(0), sampleRate };
     refreshClipFrames(clip);
-    return clip;
-  });
+    out.push(clip);
+  }
+  S.audioClips = out;
+  await refreshAllFx();
   lastAudioSignature = null;
   let need = 0;
   S.audioClips.forEach(c => { need = Math.max(need, clipEndFrame(c)); });
   if(need > frameCount()) ensureFrameCount(need);
 }
-
 function buildProjectRecord(id, name, createdAt){
   return {
     id, name,
@@ -7842,6 +8402,7 @@ function buildProjectRecord(id, name, createdAt){
     charView: S.charView,
     charViewList: JSON.parse(JSON.stringify(S.charViewList || ["front","side","back"])),
     viewKeyframes: JSON.parse(JSON.stringify(S.viewKeyframes || [])),
+    cameraKeyframes: JSON.parse(JSON.stringify(S.cameraKeyframes || [])),
     createdAt: createdAt || Date.now(),
     updatedAt: Date.now()
   };
@@ -7931,7 +8492,8 @@ async function loadProject(id){
     : [];
   // নতুন project-এর snapshot দিয়ে সম্পূর্ণ replacement; append/merge নয়।
   S.imageObjects = sanitizeImageObjects(nextImageObjects, S.layers);
-  hydrateAudioClips(rec.audioClips);
+  await hydrateAudioClips(rec.audioClips);
+if(loadVersion !== projectLoadVersion) return;
   if(Number.isFinite(rec.fps)) S.fps = rec.fps;
   if(typeof rec.bg === "string") S.bg = rec.bg;
   if(typeof rec.onion === "boolean") S.onion = rec.onion;
@@ -7940,6 +8502,7 @@ async function loadProject(id){
   S.charView = typeof rec.charView === "string" ? rec.charView : "front";
   S.charViewList = Array.isArray(rec.charViewList) && rec.charViewList.length ? rec.charViewList : ["front","side","back"];
   S.viewKeyframes = Array.isArray(rec.viewKeyframes) ? JSON.parse(JSON.stringify(rec.viewKeyframes)) : [];
+  S.cameraKeyframes = Array.isArray(rec.cameraKeyframes) ? JSON.parse(JSON.stringify(rec.cameraKeyframes)) : [];
   S.activeLayer = Math.max(0, Math.min(S.layers.length-1, rec.activeLayer || 0));
   S.frame = Math.max(0, Math.min(frameCount()-1, rec.frame || 0));
   S.selectedAudioClipId = null;
